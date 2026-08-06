@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone Node CLI intentionally uses CommonJS */
 
 /**
  * 初始化默认应用数据脚本

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Supabase is used without generated table types in the legacy adapter. */
 import { BaseStorage } from './base';
 import { App, AppStoreReview, AnalysisResult, PromptTemplate } from '@/types';
 
@@ -23,7 +24,7 @@ export class SupabaseStorage extends BaseStorage {
       }
       
       this.supabase = createClient(supabaseUrl, supabaseKey);
-    } catch (error) {
+    } catch {
       console.warn('Supabase not available, falling back to local storage');
       throw new Error('Supabase not available');
     }
@@ -58,7 +59,7 @@ export class SupabaseStorage extends BaseStorage {
         this.schemaFeatures.analysisHasAppId = true;
         this.schemaFeatures.analysisHasVersionRefs = true;
       }
-    } catch (e) {
+    } catch {
       // Fallback: assume legacy schema
       this.schemaFeatures.analysisHasAppId = false;
       this.schemaFeatures.analysisHasVersionRefs = false;
@@ -75,7 +76,7 @@ export class SupabaseStorage extends BaseStorage {
     if (error) throw error;
 
     // 将数据库字段映射为 TypeScript 字段
-    return (data || []).map(app => {
+    return (data || []).map((app: any) => {
       const { last_fetched, ...rest } = app;
       return {
         ...rest,
@@ -106,7 +107,7 @@ export class SupabaseStorage extends BaseStorage {
       .select('id');
     if (existingError) throw existingError;
 
-    const existingIds = new Set((existingRows || []).map((r: any) => r.id));
+    const existingIds = new Set<string>((existingRows || []).map((r: any) => String(r.id)));
     const newIds = new Set(apps.map(a => a.id));
 
     // 仅删除不在新列表中的应用，避免误删导致级联删除评论/分析结果
@@ -161,7 +162,7 @@ export class SupabaseStorage extends BaseStorage {
     const data = allData;
 
     // 将数据库字段映射回 TypeScript 字段
-    return (data || []).map(review => {
+    return (data || []).map((review: any) => {
       const { app_id, author, ...rest } = review;
       return {
         ...rest,
@@ -188,7 +189,7 @@ export class SupabaseStorage extends BaseStorage {
       .order('updated', { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) throw error;
-    return (data || []).map(review => {
+    return (data || []).map((review: any) => {
       const { app_id, author, ...rest } = review;
       return {
         ...rest,
@@ -212,20 +213,12 @@ export class SupabaseStorage extends BaseStorage {
 
     // 将 TypeScript 字段映射为数据库字段
     const mappedReviews = reviews.map(review => {
-      const {
-        appId,
-        authorName,
-        contentType,
-        authorUri,
-        voteCount,
-        voteSum,
-        link,
-        contentTypeLabel,
-        country,
-        ...rest
-      } = review;
+      const { appId, authorName, ...rest } = review;
+      const core = Object.fromEntries(
+        Object.entries(rest).filter(([key]) => !['contentType', 'authorUri', 'voteCount', 'voteSum', 'link', 'contentTypeLabel', 'country'].includes(key))
+      );
       return {
-        ...rest,
+        ...core,
         app_id: appId,
         author: authorName,
         // 其他字段暂时不存储到数据库，只保留核心字段
@@ -378,6 +371,7 @@ updated: {updated}
 - versionRefs 仅在文本出现版本/系统信息时给出。`,
         version: '1.0.0',
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         isActive: true
       };
 

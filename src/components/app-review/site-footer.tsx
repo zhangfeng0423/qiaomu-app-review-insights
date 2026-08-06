@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { ArrowUpRight, Gift, Github, MessageCircle, QrCode, Sparkles } from 'lucide-react';
 import {
   Dialog,
@@ -34,9 +35,11 @@ function BrandName({ className = 'text-lg' }: { className?: string }) {
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <img
+      <Image
         src="/logo.svg"
         alt="乔木 App 洞察 Logo"
+        width={40}
+        height={40}
         className={`${compact ? 'h-9 w-9 rounded-[10px]' : 'h-10 w-10 rounded-xl'} shrink-0 ring-1 ring-zinc-950/10`}
       />
       <BrandName className={compact ? 'text-[18px]' : 'text-[20px]'} />
@@ -63,9 +66,11 @@ export function RewardSupportDialog({
             如果这个工具帮你节省了时间，可以打赏支持更多免费 AI 工具和评论洞察额度。
           </DialogDescription>
         </DialogHeader>
-        <img
+        <Image
           src="/qiaomu/reward.png"
           alt="打赏二维码"
+          width={260}
+          height={260}
           className="mx-auto max-h-[62vh] w-full max-w-[260px] rounded-lg border border-zinc-200 object-contain"
         />
       </DialogContent>
@@ -99,9 +104,11 @@ export function SiteAffordances({ subtle = false }: { subtle?: boolean }) {
             <DialogTitle>关注向阳乔木</DialogTitle>
             <DialogDescription>微信公众号：向阳乔木推荐看</DialogDescription>
           </DialogHeader>
-          <img
+          <Image
             src="/qiaomu/wechat.jpg"
             alt="向阳乔木推荐看二维码"
+            width={260}
+            height={260}
             className="mx-auto max-h-[54vh] w-full max-w-[260px] rounded-lg border border-zinc-200 object-contain"
           />
           <div className="flex flex-wrap justify-center gap-2">

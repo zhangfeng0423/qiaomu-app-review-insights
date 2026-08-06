@@ -1,34 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorage } from '@/lib/storage';
-import { AnalysisService } from '@/lib/analysis/service';
+import { cachedPageToLegacyAnalysis, cachedPageToLegacyApp, findCachedReviewPage } from '@/lib/appstore/cache';
 import { ReportGenerator } from '@/lib/report/generator';
-
-const storage = getStorage();
-const analysisService = new AnalysisService();
 
 // GET /api/apps/[id]/export-report - 导出分析报告
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format') || 'markdown'; // markdown, html, summary
     
-    // 检查应用是否存在
-    const apps = await storage.getApps();
-    const app = apps.find(a => a.id === id);
-    
-    if (!app) {
+    const page = await findCachedReviewPage(id);
+    if (!page) {
       return NextResponse.json(
         { error: '应用不存在' },
         { status: 404 }
       );
     }
+    const app = cachedPageToLegacyApp(page);
 
-    // 生成聚合分析
-    const analysis = await analysisService.generateAggregatedAnalysis(id);
+    const analysis = cachedPageToLegacyAnalysis(page);
     
     let content: string;
     let contentType: string;

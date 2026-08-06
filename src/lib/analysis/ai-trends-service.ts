@@ -1,6 +1,8 @@
 import { getStorage } from '@/lib/storage';
 import { KimiClient } from './kimi-client';
 
+interface TrendPayload { bullets?: unknown }
+
 export class AiTrendsService {
   private storage = getStorage();
   private kimiClient: KimiClient | null = null;
@@ -37,7 +39,9 @@ export class AiTrendsService {
       const s = aMap.get(r.id) || 'neutral';
       const bucket = byMonth.get(key)!;
       bucket.total++;
-      (bucket as any)[s === 'positive' ? 'pos' : s === 'negative' ? 'neg' : 'neu']++;
+      if (s === 'positive') bucket.pos++;
+      else if (s === 'negative') bucket.neg++;
+      else bucket.neu++;
     });
 
     const table = months.map(m => {
@@ -54,18 +58,18 @@ export class AiTrendsService {
     `输出 JSON: { "bullets": ["要点1","要点2",...] }`;
 
     const kimi = this.getKimi();
-    const completion = await kimi['client'].chat.completions.create({
-      model: (kimi as any).model || 'kimi-k2-0905-preview',
+    const completion = await kimi.getCompletionClient().chat.completions.create({
+      model: kimi.getModelInfo().model,
       messages: [ { role: 'system', content: '只返回严格 JSON' }, { role: 'user', content: prompt } ],
       temperature: 0.2,
       max_tokens: 400,
-      response_format: { type: 'json_object' } as any,
+      response_format: { type: 'json_object' },
     });
     const content = completion.choices?.[0]?.message?.content || '';
     try {
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(content) as TrendPayload;
       const arr = Array.isArray(parsed.bullets) ? parsed.bullets : [];
-      return arr.map((s: any) => String(s)).filter(Boolean).slice(0, 5);
+      return arr.map((item) => String(item)).filter(Boolean).slice(0, 5);
     } catch {
       return [];
     }

@@ -90,10 +90,9 @@ export class AppStoreFetcher {
     try {
       const allReviews: AppStoreReview[] = [];
       let page = 1;
-      let hasMorePages = true;
       let shouldStop = false;
 
-      while (hasMorePages && !shouldStop) {
+      while (!shouldStop) {
         console.log(`Fetching page ${page}...`);
 
         const pageReviews = await this.fetchPageReviews(appId, country, page);
@@ -134,12 +133,12 @@ export class AppStoreFetcher {
           break;
         }
 
-        // 检查是否还有更多页面
-        hasMorePages = await this.hasMorePages(appId, country, page);
+        // RSS 每页通常最多返回 50 条；不足一页时直接结束，避免为了判断下一页而重复请求。
+        if (pageReviews.length < 50) break;
         page++;
 
         // 添加延迟避免请求过快
-        if (hasMorePages && !shouldStop) {
+        if (!shouldStop) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
@@ -336,20 +335,6 @@ export class AppStoreFetcher {
       source: 'app-store-html',
       sourceCountry: country,
     };
-  }
-
-  /**
-   * 检查是否还有更多页面
-   */
-  private static async hasMorePages(appId: string, country: string, currentPage: number): Promise<boolean> {
-    try {
-      // 尝试获取下一页，如果返回空或错误，说明没有更多页面
-      const nextPage = currentPage + 1;
-      return (await this.fetchPageReviews(appId, country, nextPage)).length > 0;
-    } catch {
-      console.log(`No more pages after page ${currentPage}`);
-      return false;
-    }
   }
 
   /**

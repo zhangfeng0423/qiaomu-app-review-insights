@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Save, X, Edit, Eye, TestTube } from 'lucide-react';
+import { Save, X, Edit, TestTube } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 interface PromptEditorProps {

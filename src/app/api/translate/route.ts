@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { KimiClient } from '@/lib/analysis/kimi-client';
 import { createClient } from '@supabase/supabase-js';
 
+interface TranslateItem { id: string; title: string; content: string }
+interface TranslationRow { review_id: string; title_zh: string | null; content_zh: string | null }
+
 // POST /api/translate - 批量翻译标题与内容为中文
 // body: { items: Array<{ id: string; title: string; content: string }>, targetLang?: 'zh' }
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const items = Array.isArray(body?.items) ? body.items : [];
+    const items: TranslateItem[] = Array.isArray(body?.items) ? body.items as TranslateItem[] : [];
 
     if (items.length === 0) {
       return NextResponse.json({ success: true, data: {} });
@@ -35,13 +38,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!probe.error) tableAvailable = true;
         
         if (tableAvailable) {
-          const ids = items.map((i: any) => i.id);
+          const ids = items.map((i) => i.id);
           const { data, error } = await supabase
             .from('review_translations')
             .select('review_id, title_zh, content_zh')
             .in('review_id', ids);
           if (error) throw error;
-          (data || []).forEach((row: any) => {
+          (data as TranslationRow[] || []).forEach((row) => {
             results[row.review_id] = {
               titleZh: row.title_zh || '',
               contentZh: row.content_zh || '',
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         `内容: ${item.content || ''}`;
 
       const completion = await kimi['client'].chat.completions.create({
-        model: (kimi as any).model || 'kimi-k2-0905-preview',
+        model: kimi.getModelInfo().model,
         messages: [
           { role: 'system', content: '你是一个专业的中英互译助手。' },
           { role: 'user', content: prompt },
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const parsed = JSON.parse(content);
         titleZh = parsed.titleZh || '';
         contentZh = parsed.contentZh || '';
-      } catch (_e) {
+      } catch {
         // 回退：若不是合法 JSON，直接当作纯文本塞进 contentZh/titleZh
         contentZh = content.trim();
       }
@@ -92,14 +95,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // 写入 Supabase（忽略失败，不阻塞）
       if (useSupabase && supabase && tableAvailable) {
         try {
+          const translationRow = {
+            review_id: item.id,
+            title_zh: titleZh,
+            content_zh: contentZh,
+            updated_at: new Date().toISOString(),
+          };
           const { error } = await supabase
             .from('review_translations')
-            .upsert({
-              review_id: item.id,
-              title_zh: titleZh,
-              content_zh: contentZh,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'review_id' });
+            .upsert(translationRow as never, { onConflict: 'review_id' });
           if (error) console.warn('Upsert translation failed:', error.message);
         } catch (e) {
           console.warn('Upsert translation to Supabase threw:', e);

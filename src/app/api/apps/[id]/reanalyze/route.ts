@@ -1,28 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AnalysisService } from '@/lib/analysis/service';
-import { getStorage } from '@/lib/storage';
+import { findCachedReviewPage, generateCachedReviewPage } from '@/lib/appstore/cache';
 
-const storage = getStorage();
-const service = new AnalysisService();
-
-// POST /api/apps/[id]/reanalyze - 重新分析（包含已分析评论）
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    void request;
     const { id } = await params;
-    const apps = await storage.getApps();
-    const app = apps.find(a => a.id === id);
-    if (!app) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
+    const existing = await findCachedReviewPage(id);
+    if (!existing) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
-    const reviews = await storage.getReviews(id);
-    if (reviews.length === 0) {
-      return NextResponse.json({ success: false, error: '无评论数据' }, { status: 400 });
-    }
-
-    const results = await service.analyzeAppReviews(id, { includeAnalyzed: true, batchSize: 3 });
-    return NextResponse.json({ success: true, data: { reanalyzed: results.length } });
-  } catch (e) {
-    console.error('reanalyze failed:', e);
-    return NextResponse.json({ success: false, error: '重新分析失败' }, { status: 500 });
+    const generated = await generateCachedReviewPage({
+      appId: id,
+      country: existing.app.country,
+      incremental: false,
+      analyze: true,
+      force: true,
+      maxReviews: existing.maxReviews,
+    });
+    return NextResponse.json({ success: true, data: { reanalyzed: generated.page.insights ? generated.page.stats.totalReviews : 0 } });
+  } catch (error) {
+    console.error('reanalyze failed:', error);
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : '重新分析失败' }, { status: 500 });
   }
 }
-

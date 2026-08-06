@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { App, AppStoreReview, AnalysisResult } from '@/types';
 import { ReviewList } from '@/components/reviews/review-list';
@@ -18,16 +18,10 @@ export default function ReviewsPage() {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit] = useState(50);
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null);
 
-  useEffect(() => {
-    if (appId) {
-      loadData();
-    }
-  }, [appId, page, limit]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -53,7 +47,11 @@ export default function ReviewsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [appId, page, limit]);
+
+  useEffect(() => {
+    if (appId) void loadData();
+  }, [appId, loadData]);
 
   // 下载 CSV 文件
   const downloadCSV = () => {

@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorage } from '@/lib/storage';
-import { ThemesService } from '@/lib/analysis/themes-service';
+import { findCachedReviewPage } from '@/lib/appstore/cache';
+import { ThemeItem } from '@/lib/analysis/kimi-client';
 
-const storage = getStorage();
-const svc = new ThemesService();
+function toThemeItem(item: { title: string; summary: string; evidence?: string; reviewIds?: string[] }): ThemeItem {
+  const ids = item.reviewIds || [];
+  return {
+    title: item.title,
+    summary: item.summary,
+    examples: ids.slice(0, 2).map((id) => ({ id, snippet: item.evidence || item.summary })),
+  };
+}
 
 // GET /api/apps/[id]/ai-themes
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const apps = await storage.getApps();
-    const app = apps.find(a => a.id === id);
-    if (!app) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
+    const page = await findCachedReviewPage(id);
+    if (!page) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
-    const url = new URL(request.url);
-    const max = parseInt(url.searchParams.get('max') || '300');
-    const fresh = ['1', 'true', 'yes'].includes((url.searchParams.get('fresh') || '').toLowerCase());
-    const { positive, negative } = await svc.getTopThemes(id, { maxSamples: Math.max(50, Math.min(1000, max)), fresh });
+    const positive = (page.insights?.positiveSignals || []).map(toThemeItem).slice(0, 5);
+    const negative = (page.insights?.painPoints || []).map(toThemeItem).slice(0, 5);
 
     return NextResponse.json({ success: true, data: { positive, negative } });
   } catch (e) {

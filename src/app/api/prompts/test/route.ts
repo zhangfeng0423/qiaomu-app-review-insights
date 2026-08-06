@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KimiClient } from '@/lib/analysis/kimi-client';
+import { AnalysisResponse, KimiClient } from '@/lib/analysis/kimi-client';
 import { ApiResponse } from '@/types';
 
 // POST /api/prompts/test - 测试 Prompt 模板
 export async function POST(
   request: NextRequest
-): Promise<NextResponse<ApiResponse<{ result: any }>>> {
+): Promise<NextResponse<ApiResponse<{ result: AnalysisResponse }>>> {
   try {
     const body = await request.json();
     
@@ -32,7 +32,7 @@ export async function POST(
     const { prompt, testData } = body;
     
     // 替换 Prompt 中的变量
-    let processedPrompt = prompt
+    const processedPrompt = prompt
       .replace(/\{review_content\}/g, testData.content || '')
       .replace(/\{rating\}/g, testData.rating || '')
       .replace(/\{version\}/g, testData.version || '');
@@ -41,7 +41,26 @@ export async function POST(
 
     // 使用 Kimi API 进行测试
     const kimiClient = new KimiClient();
-    const result = await kimiClient.analyzeReview(processedPrompt);
+    const result = await kimiClient.analyzeReview(
+      {
+        title: testData.title || 'Prompt 测试评论',
+        content: testData.content || '',
+        rating: testData.rating || '',
+        version: testData.version || '',
+        authorName: testData.authorName || '',
+        updated: testData.updated || '',
+      },
+      {
+        id: 'prompt-test',
+        name: 'Prompt 测试模板',
+        description: '临时测试模板',
+        content: processedPrompt,
+        version: '1.0.0',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: false,
+      }
+    );
     
     console.log('Prompt test result:', result);
 

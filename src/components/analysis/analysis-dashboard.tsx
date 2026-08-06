@@ -1,18 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { AggregatedAnalysis, App } from '@/types';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { AggregatedAnalysis, App, AppStoreReview } from '@/types';
+import { AiInsights } from '@/lib/analysis/ai-insights-service';
+import { ThemeItem } from '@/lib/analysis/kimi-client';
 import { SentimentChart } from './sentiment-chart';
-import { ClusteredIssues } from './clustered-issues';
-import { SuggestionsList } from './suggestions-list';
-import { VersionAnalysis } from './version-analysis';
 import { VersionSentiment } from './version-sentiment';
 import { TopThemes } from './top-themes';
 import { TopTrends } from './top-trends';
 import { ReportPreview } from '@/components/report/report-preview';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Download, BarChart3, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
@@ -32,19 +30,11 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
   const analyzeAbort = useRef({ stop: false });
   const PAGE_SIZE = 50;
   const COVERAGE_TARGET = 85;
-  const [themes, setThemes] = useState<{ positive: any[]; negative: any[] } | null>(null);
+  const [themes, setThemes] = useState<{ positive: ThemeItem[]; negative: ThemeItem[] } | null>(null);
   const [trends, setTrends] = useState<string[] | null>(null);
-  const [aiInsights, setAiInsights] = useState<{ issueTaxonomy: any[]; topSuggestions: any[]; quickInsights: string[] } | null>(null);
+  const [, setAiInsights] = useState<AiInsights | null>(null);
 
-  useEffect(() => {
-    loadAnalysis();
-    loadProgress();
-    loadThemes();
-    loadTrends();
-    loadAiInsights();
-  }, [app.id]);
-
-  const loadAnalysis = async () => {
+  const loadAnalysis = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/apps/${app.id}/analysis`);
@@ -61,7 +51,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [app.id]);
 
   const generateAnalysis = async () => {
     try {
@@ -118,7 +108,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
       const reviews = data.data?.reviews || [];
       if (!reviews.length) { alert('没有评论数据可以下载'); return; }
       const headers = ['标题', '内容', '评分', '版本', '作者', '时间'];
-      const rows = reviews.map((r: any) => [
+      const rows = reviews.map((r: AppStoreReview) => [
         `"${(r.title || '').replace(/\"/g, '""')}"`,
         `"${(r.content || '').replace(/\"/g, '""')}"`,
         r.rating || '',
@@ -126,7 +116,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         `"${(r.authorName || '').replace(/\"/g, '""')}"`,
         r.updated || ''
       ]);
-      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const csv = [headers.join(','), ...rows.map((row: Array<string | number>) => row.join(','))].join('\n');
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -139,7 +129,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
     }
   };
 
-  const loadProgress = async () => {
+  const loadProgress = useCallback(async () => {
     try {
       const res = await fetch(`/api/apps/${app.id}/analyze-progress`);
       if (res.ok) {
@@ -147,9 +137,9 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         setProgress(data.data);
       }
     } catch {}
-  };
+  }, [app.id]);
 
-  const loadThemes = async () => {
+  const loadThemes = useCallback(async () => {
     try {
       const res = await fetch(`/api/apps/${app.id}/ai-themes?max=300`);
       if (res.ok) {
@@ -165,9 +155,9 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         }
       }
     } catch {}
-  };
+  }, [app.id]);
 
-  const loadTrends = async () => {
+  const loadTrends = useCallback(async () => {
     try {
       const res = await fetch(`/api/apps/${app.id}/ai-trends`);
       if (res.ok) {
@@ -175,9 +165,9 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         setTrends(data.data?.bullets || []);
       }
     } catch {}
-  };
+  }, [app.id]);
 
-  const loadAiInsights = async () => {
+  const loadAiInsights = useCallback(async () => {
     try {
       const res = await fetch(`/api/apps/${app.id}/ai-insights?max=500`);
       if (res.ok) {
@@ -193,20 +183,15 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         }
       }
     } catch {}
-  };
+  }, [app.id]);
 
-  // 简单兜底：当 AI 结果为空时，用结构化聚合作为占位，避免空白
-  const aiFallback = (() => {
-    if (aiInsights && (aiInsights.topSuggestions?.length || aiInsights.issueTaxonomy?.length || aiInsights.quickInsights?.length)) return aiInsights;
-    if (!analysis) return null;
-    const issueTaxonomy = (analysis.clusteredIssues || []).map(cat => ({
-      category: cat.category,
-      items: (cat.issues || []).slice(0,5).map(it => ({ title: it.issue, summary: `用户反馈：${it.issue}（${it.count} 次）`, examples: [{ snippet: it.examples?.[0] || '' }] }))
-    })).slice(0,7);
-    const topSuggestions = (analysis.suggestions || []).slice(0,10).map(it => ({ title: it.suggestion, summary: `较多用户提出：${it.suggestion}`, examples: [{ snippet: it.examples?.[0] || '' }] }));
-    const quickInsights: string[] = (trends || []);
-    return { issueTaxonomy, topSuggestions, quickInsights };
-  })();
+  useEffect(() => {
+    void loadAnalysis();
+    void loadProgress();
+    void loadThemes();
+    void loadTrends();
+    void loadAiInsights();
+  }, [app.id, loadAiInsights, loadAnalysis, loadProgress, loadThemes, loadTrends]);
 
   const analyzeOnePage = async (offset: number) => {
     const res = await fetch(`/api/apps/${app.id}/analyze-page?offset=${offset}&limit=${PAGE_SIZE}`, { method: 'POST' });

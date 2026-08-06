@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import Image from 'next/image';
 import {
   AlertCircle,
   Apple,
@@ -22,6 +23,8 @@ import {
   reviewSourceLabel,
 } from '@/components/app-review/source-breakdown';
 import { TopChartsSection } from '@/components/app-review/top-charts-section';
+import ProductSignals from '@/components/app-review/product-signals';
+import { ProductSignal } from '@/lib/signals/types';
 import { AppStoreReview } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -226,9 +229,12 @@ function AppIcon({ app }: { app: AppStoreLookupResult }) {
   }
 
   return (
-    <img
+    <Image
       src={app.artworkUrl}
       alt={`${app.name} icon`}
+      width={64}
+      height={64}
+      unoptimized
       className="h-16 w-16 rounded-lg border border-zinc-200 bg-white object-cover shadow-sm"
     />
   );
@@ -269,9 +275,12 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
             className="group flex min-w-0 gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
           >
             {app.artworkUrl ? (
-              <img
+              <Image
                 src={app.artworkUrl}
                 alt={`${app.name} icon`}
+                width={48}
+                height={48}
+                unoptimized
                 className="h-12 w-12 shrink-0 rounded-lg border border-zinc-200 bg-white object-cover"
               />
             ) : (
@@ -350,12 +359,14 @@ export default function Home({
   topChartCountries = [],
   topChartCategories = [],
   initialTopChartApps = [],
+  initialProductSignals = [],
 }: {
   featuredApps?: FeaturedAppSummary[];
   initialCachePage?: number;
   topChartCountries?: TopChartCountry[];
   topChartCategories?: TopChartCategory[];
   initialTopChartApps?: TopChartApp[];
+  initialProductSignals?: ProductSignal[];
 }) {
   const [query, setQuery] = useState('ChatGPT');
   const [country, setCountry] = useState('cn');
@@ -408,6 +419,10 @@ export default function Home({
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <BrandMark compact />
           <div className="flex items-center gap-2">
+            <a href="/opportunities" className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-700 transition hover:border-teal-300 hover:bg-teal-100">
+              <Lightbulb className="h-4 w-4" />
+              发现机会
+            </a>
             <SiteAffordances subtle />
           </div>
         </div>
@@ -677,6 +692,7 @@ export default function Home({
         </section>
       ) : (
         <>
+          <ProductSignals signals={initialProductSignals} />
           <TopChartsSection
             countries={topChartCountries}
             categories={topChartCategories}

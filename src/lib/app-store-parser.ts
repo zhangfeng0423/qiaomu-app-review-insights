@@ -55,7 +55,7 @@ export function parseAppStoreUrl(url: string): ParsedAppInfo | null {
       // 如果名称包含中文编码，尝试进一步解码
       try {
         appName = decodeURIComponent(appName);
-      } catch (e) {
+      } catch {
         // 解码失败，使用原始名称
       }
       

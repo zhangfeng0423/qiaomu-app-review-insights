@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/storage';
 import { KimiClient } from '@/lib/analysis/kimi-client';
 
@@ -62,9 +62,8 @@ export async function GET(): Promise<NextResponse> {
     }
 
     // 4. 测试 Kimi Client 初始化
-    let kimiClient;
     try {
-      kimiClient = new KimiClient();
+      new KimiClient();
     } catch (error) {
       return NextResponse.json({
         success: false,

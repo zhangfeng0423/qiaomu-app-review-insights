@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorage } from '@/lib/storage';
-import { AppStoreService } from '@/lib/appstore/service';
+import { findCachedReviewPage, generateCachedReviewPage } from '@/lib/appstore/cache';
 import { ApiResponse } from '@/types';
-
-const storage = getStorage();
-const appStoreService = new AppStoreService();
 
 interface FetchResult {
   reviewCount: number;
@@ -14,45 +10,29 @@ interface FetchResult {
 // POST /api/apps/[id]/fetch - 抓取指定应用的评论
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<FetchResult>>> {
   try {
-    const { id } = params;
+    void request;
+    const { id } = await params;
     
-    // 检查应用是否存在
-    const apps = await storage.getApps();
-    const app = apps.find(a => a.id === id);
-    
-    if (!app) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '应用不存在',
-        },
-        { status: 404 }
-      );
+    const existing = await findCachedReviewPage(id);
+    if (!existing) {
+      return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
     }
-
-    console.log(`Starting to fetch reviews for app: ${app.name} (${app.id})`);
-
-    // 抓取评论
-    let reviews;
-    try {
-      // 使用增量抓取：首次抓取时因为没有 lastFetched，会自动退化为全量抓取；
-      // 之后会根据 apps.lastFetched 进行增量。
-      reviews = await appStoreService.fetchAppReviews(id, true);
-      console.log(`Successfully fetched ${reviews.length} reviews`);
-    } catch (fetchError) {
-      console.error('Fetch error details:', fetchError);
-      throw new Error(`抓取失败: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
-    }
+    const generated = await generateCachedReviewPage({
+      appId: id,
+      country: existing.app.country,
+      incremental: true,
+      analyze: true,
+      force: true,
+    });
+    const reviewCount = Math.max(0, generated.page.stats.totalReviews - (existing?.stats.totalReviews || 0));
 
     const result: FetchResult = {
-      reviewCount: reviews.length,
-      message: `成功抓取 ${reviews.length} 条新评论`,
+      reviewCount,
+      message: `统一研究缓存已更新，新增 ${reviewCount} 条评论`,
     };
-
-    console.log(`Fetch completed for app: ${app.name}, got ${reviews.length} reviews`);
 
     return NextResponse.json({
       success: true,

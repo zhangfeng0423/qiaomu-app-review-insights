@@ -23,6 +23,15 @@ const LABELS = {
   neutral: '中性',
 };
 
+interface PieLabelProps {
+  cx?: number | string;
+  cy?: number | string;
+  midAngle?: number;
+  innerRadius?: number | string;
+  outerRadius?: number | string;
+  percent?: number;
+}
+
 export function SentimentChart({ data }: SentimentChartProps) {
   const chartData = [
     { name: LABELS.positive, value: data.positive, color: COLORS.positive },
@@ -32,20 +41,20 @@ export function SentimentChart({ data }: SentimentChartProps) {
 
   const total = data.positive + data.negative + data.neutral;
 
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const renderCustomizedLabel = ({ cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius = 0, percent = 0 }: PieLabelProps) => {
     if (percent < 0.05) return null; // 不显示小于5%的标签
     
     const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const radius = Number(innerRadius) + (Number(outerRadius) - Number(innerRadius)) * 0.5;
+    const x = Number(cx) + radius * Math.cos(-midAngle * RADIAN);
+    const y = Number(cy) + radius * Math.sin(-midAngle * RADIAN);
 
     return (
       <text 
         x={x} 
         y={y} 
         fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
+        textAnchor={x > Number(cx) ? 'start' : 'end'}
         dominantBaseline="central"
         fontSize={12}
         fontWeight="bold"

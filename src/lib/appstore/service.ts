@@ -148,7 +148,7 @@ export class AppStoreService {
    */
   async getAllAppsStats(): Promise<Array<{
     app: App;
-    stats: Awaited<ReturnType<typeof this.getAppReviewStats>>;
+    stats: Awaited<ReturnType<AppStoreService['getAppReviewStats']>>;
   }>> {
     const apps = await this.storage.getApps();
     const results = [];

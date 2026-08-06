@@ -73,7 +73,7 @@ export function IssuesChart({ data, title = "常见问题", maxItems = 10 }: Iss
                   const item = chartData.find(d => d.shortIssue === label);
                   return item ? item.issue : label;
                 }}
-                content={({ active, payload, label }) => {
+                content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
                     return (

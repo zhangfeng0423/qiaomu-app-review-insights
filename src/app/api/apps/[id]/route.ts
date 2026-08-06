@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorage } from '@/lib/storage';
+import { cachedPageToLegacyApp, deleteCachedReviewPage, findCachedReviewPage, updateCachedReviewPageMetadata } from '@/lib/appstore/cache';
 import { App, ApiResponse } from '@/types';
-
-const storage = getStorage();
 
 // GET /api/apps/[id] - 获取单个应用
 export async function GET(
@@ -10,24 +8,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<App>>> {
   try {
+    void request;
     const { id } = await params;
-    const apps = await storage.getApps();
-    const app = apps.find(a => a.id === id);
-
-    if (!app) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: '应用不存在',
-        },
-        { status: 404 }
-      );
+    const cachedPage = await findCachedReviewPage(id);
+    if (cachedPage) {
+      return NextResponse.json({
+        success: true,
+        data: cachedPageToLegacyApp(cachedPage),
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: app,
-    });
+    return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
   } catch (error) {
     console.error('Failed to get app:', error);
     
@@ -72,10 +63,8 @@ export async function PUT(
       );
     }
 
-    const apps = await storage.getApps();
-    const appIndex = apps.findIndex(a => a.id === id);
-
-    if (appIndex === -1) {
+    const currentPage = await findCachedReviewPage(id);
+    if (!currentPage) {
       return NextResponse.json(
         {
           success: false,
@@ -85,15 +74,12 @@ export async function PUT(
       );
     }
 
-    // 更新应用
-    const updatedApp: App = {
-      ...apps[appIndex],
+    const updatedPage = await updateCachedReviewPageMetadata(id, currentPage.app.country, {
       name: name.trim(),
       country: country.toLowerCase().trim(),
-    };
-
-    apps[appIndex] = updatedApp;
-    await storage.saveApps(apps);
+    });
+    if (!updatedPage) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
+    const updatedApp = cachedPageToLegacyApp(updatedPage);
 
     return NextResponse.json({
       success: true,
@@ -119,11 +105,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<null>>> {
   try {
+    void request;
     const { id } = await params;
-    const apps = await storage.getApps();
-    const appIndex = apps.findIndex(a => a.id === id);
-
-    if (appIndex === -1) {
+    const deleted = await deleteCachedReviewPage(id);
+    if (!deleted) {
       return NextResponse.json(
         {
           success: false,
@@ -132,10 +117,6 @@ export async function DELETE(
         { status: 404 }
       );
     }
-
-    // 删除应用
-    apps.splice(appIndex, 1);
-    await storage.saveApps(apps);
 
     return NextResponse.json({
       success: true,

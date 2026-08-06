@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+interface ReviewRow { id: string; app_id: string | null }
+interface BackfillRow { id: string; review_id: string; version_refs: unknown }
+
 // POST /api/migrate-backfill - 在完成 DDL 迁移后，回填 analysis_results.app_id 与 version_refs
 export async function POST(): Promise<NextResponse> {
   try {
@@ -30,21 +33,22 @@ export async function POST(): Promise<NextResponse> {
 
     let updated = 0;
     if (missingAppId && missingAppId.length > 0) {
-      const reviewIds = missingAppId.map(r => r.review_id);
+      const rows = missingAppId as BackfillRow[];
+      const reviewIds = rows.map(r => r.review_id);
       const { data: reviewRows, error: reviewErr } = await supabase
         .from('reviews')
         .select('id, app_id')
         .in('id', reviewIds);
       if (reviewErr) throw reviewErr;
       const map = new Map<string, string>();
-      (reviewRows || []).forEach(r => map.set(r.id, (r as any).app_id));
+      (reviewRows as ReviewRow[] || []).forEach(r => map.set(r.id, r.app_id || ''));
 
       // 构造 upsert 载荷（仅更新 id/app_id/version_refs）
-      const payload = missingAppId.map(row => ({
+      const payload = rows.map(row => ({
         id: row.id,
         app_id: map.get(row.review_id) || null,
         // 确保 version_refs 至少为空数组
-        version_refs: Array.isArray((row as any).version_refs) ? (row as any).version_refs : [],
+        version_refs: Array.isArray(row.version_refs) ? row.version_refs : [],
       }));
 
       // 分批 upsert，避免 URL 过长
@@ -82,4 +86,3 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : '回填失败' }, { status: 500 });
   }
 }
-

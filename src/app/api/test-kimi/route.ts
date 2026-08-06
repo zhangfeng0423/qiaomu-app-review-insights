@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // GET /api/test-kimi - 测试 Moonshot API 配置
 export async function GET(): Promise<NextResponse> {

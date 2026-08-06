@@ -17,26 +17,25 @@ export default function AnalysisPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (appId) {
-      loadApp();
-    }
-  }, [appId]);
-
-  const loadApp = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/apps/${appId}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setApp(data.data);
+    if (!appId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/apps/${appId}`);
+        if (response.ok && !cancelled) {
+          const data = await response.json();
+          setApp(data.data);
+        }
+      } catch (error) {
+        console.error('Failed to load app:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load app:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [appId]);
 
   if (loading) {
     return (

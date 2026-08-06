@@ -75,7 +75,7 @@ export function SuggestionsChart({ data, title = "改进建议", maxItems = 10 }
                   const item = chartData.find(d => d.shortSuggestion === label);
                   return item ? item.suggestion : label;
                 }}
-                content={({ active, payload, label }) => {
+                content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
                     return (

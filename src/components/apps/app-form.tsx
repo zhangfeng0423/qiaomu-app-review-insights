@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { App } from '@/types';
-import { getCountryFlag, getCountryName } from '@/lib/utils';
+import { getCountryFlag } from '@/lib/utils';
 import { parseAppStoreUrl, validateAppStoreUrl, validateAppId, EXAMPLE_URLS } from '@/lib/app-store-parser';
 import { Link, Sparkles } from 'lucide-react';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppStoreReview, AnalysisResult } from '@/types';
 import { ReviewCard } from './review-card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ interface ReviewListProps {
 }
 
 type SortOption = 'date' | 'rating' | 'sentiment';
-type FilterOption = 'all' | '5' | '4' | '3' | '2' | '1';
+type FilterOption = 'all' | '5' | '4' | '3' | '2' | '1' | 'positive' | 'negative' | 'neutral';
 
 export function ReviewList({ reviews, analysisResults, showAnalysis = true, serverPagination }: ReviewListProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,7 +48,7 @@ export function ReviewList({ reviews, analysisResults, showAnalysis = true, serv
 
   // 过滤和排序评论
   const filteredAndSortedReviews = useMemo(() => {
-    let filtered = reviews;
+    let filtered = [...reviews];
 
     // 搜索过滤
     if (searchTerm) {
@@ -61,8 +61,12 @@ export function ReviewList({ reviews, analysisResults, showAnalysis = true, serv
     }
 
     // 评分过滤
-    if (filter !== 'all') {
+    if (['5', '4', '3', '2', '1'].includes(filter)) {
       filtered = filtered.filter(review => review.rating.toString() === filter);
+    }
+
+    if (filter === 'positive' || filter === 'negative' || filter === 'neutral') {
+      filtered = filtered.filter(review => (analysisMap.get(review.id)?.sentiment || 'neutral') === filter);
     }
 
     // 排序
@@ -116,17 +120,19 @@ export function ReviewList({ reviews, analysisResults, showAnalysis = true, serv
         if (!res.ok) return;
         const data = await res.json();
         const map = data?.data || {};
-        const next = { ...translations };
-        for (const id of Object.keys(map)) {
-          next[id] = map[id];
-          sessionStorage.setItem(`rev_tr_${id}`, JSON.stringify(map[id]));
-        }
-        setTranslations(next);
-      } catch (_e) {
+        setTranslations((currentTranslations) => {
+          const next = { ...currentTranslations };
+          for (const id of Object.keys(map)) {
+            next[id] = map[id];
+            sessionStorage.setItem(`rev_tr_${id}`, JSON.stringify(map[id]));
+          }
+          return next;
+        });
+      } catch {
         // 静默失败，不影响原文显示
       }
     })();
-  }, [paginatedReviews]);
+  }, [paginatedReviews, translations]);
 
   // 从 URL 初始化搜索（支持 ?q=）
   useEffect(() => {
@@ -157,8 +163,8 @@ export function ReviewList({ reviews, analysisResults, showAnalysis = true, serv
   };
 
   // 获取基于搜索过滤的评论统计（不包括情感和评分过滤）
-  const getBaseFilteredReviews = () => {
-    let filtered = reviews;
+  const getBaseFilteredReviews = useCallback(() => {
+    let filtered = [...reviews];
 
     // 只应用搜索过滤
     if (searchTerm) {
@@ -171,7 +177,7 @@ export function ReviewList({ reviews, analysisResults, showAnalysis = true, serv
     }
 
     return filtered;
-  };
+  }, [reviews, searchTerm]);
 
   // 情感统计：基于搜索过滤后的集合，统计正负中数量
   const sentimentStats = useMemo(() => {
@@ -182,7 +188,7 @@ export function ReviewList({ reviews, analysisResults, showAnalysis = true, serv
       if (s === 'positive' || s === 'negative' || s === 'neutral') counts[s]++;
     });
     return counts;
-  }, [analysisMap, reviews, searchTerm]);
+  }, [analysisMap, getBaseFilteredReviews]);
 
 
 

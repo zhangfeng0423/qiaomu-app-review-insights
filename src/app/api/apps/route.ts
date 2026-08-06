@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorage } from '@/lib/storage';
+import { cachedPageToLegacyApp, getCachedAppSummaries, generateCachedReviewPage } from '@/lib/appstore/cache';
 import { App, ApiResponse } from '@/types';
-
-const storage = getStorage();
 
 // GET /api/apps - 获取所有应用
 export async function GET(): Promise<NextResponse<ApiResponse<{ apps: App[] }>>> {
   try {
-    const apps = await storage.getApps();
+    const apps = (await getCachedAppSummaries()).map((summary) => ({
+      id: summary.id,
+      name: summary.name,
+      country: summary.country,
+      lastFetched: summary.updatedAt,
+    }));
     
     return NextResponse.json({
       success: true,
@@ -63,29 +66,25 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       );
     }
 
-    // 检查是否已存在（仅在添加新应用时检查）
-    const existingApps = await storage.getApps();
-    const duplicate = existingApps.find(app => app.id === id);
-
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `应用 "${duplicate.name}" (ID: ${duplicate.id}) 已存在，请使用编辑功能修改现有应用`,
-        },
-        { status: 409 }
-      );
+    const normalizedId = id.trim();
+    const normalizedCountry = country.toLowerCase().trim();
+    const existing = (await getCachedAppSummaries()).find((app) => app.id === normalizedId && app.country === normalizedCountry);
+    if (existing) {
+      return NextResponse.json({ success: true, data: {
+        id: existing.id,
+        name: existing.name,
+        country: existing.country,
+        lastFetched: existing.updatedAt,
+      } satisfies App, message: '应用已在研究缓存中' });
     }
 
-    // 创建新应用
-    const newApp: App = {
-      id: id.trim(),
-      name: name.trim(),
-      country: country.toLowerCase().trim(),
-    };
-
-    const updatedApps = [...existingApps, newApp];
-    await storage.saveApps(updatedApps);
+    const generated = await generateCachedReviewPage({
+      appId: normalizedId,
+      country: normalizedCountry,
+      query: name.trim(),
+      analyze: true,
+    });
+    const newApp = cachedPageToLegacyApp(generated.page);
 
     return NextResponse.json({
       success: true,

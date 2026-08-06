@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone Node CLI intentionally uses CommonJS */
 /*
  * Run DDL migrations on Supabase using an RPC function `exec_sql` if available.
  * Falls back to simple existence checks via information_schema and tries safer alternatives.

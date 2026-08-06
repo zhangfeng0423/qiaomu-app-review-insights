@@ -14,7 +14,8 @@ import {
 import { ReviewDiagnostics, buildReviewDiagnostics } from '@/lib/appstore/diagnostics';
 import { upsertReviewHistory } from '@/lib/appstore/review-history';
 import { ReviewStats, sortReviewsForAnalysis, summarizeReviews } from '@/lib/appstore/review-summary';
-import { AppReviewSource, AppStoreReview } from '@/types';
+import { prepareReviewCorpus } from '@/lib/analysis/review-preprocessor';
+import { AggregatedAnalysis, App, AppReviewSource, AppStoreReview } from '@/types';
 
 export interface CachedModelInfo {
   provider: string;
@@ -413,6 +414,123 @@ export async function listCachedReviewPages(): Promise<CachedAppReviewPage[]> {
   }
 }
 
+export async function findCachedReviewPage(appId: string, country?: string): Promise<CachedAppReviewPage | null> {
+  const normalizedCountry = country ? normalizeCountry(country) : undefined;
+  if (normalizedCountry) {
+    return readCachedReviewPage(normalizedCountry, appId);
+  }
+
+  const pages = await listCachedReviewPages();
+  return pages
+    .filter((page) => page.app.id === appId)
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] || null;
+}
+
+export async function updateCachedReviewPageMetadata(
+  appId: string,
+  currentCountry: string,
+  updates: { name: string; country: string }
+): Promise<CachedAppReviewPage | null> {
+  const page = await readCachedReviewPage(currentCountry, appId);
+  if (!page) return null;
+
+  const app = {
+    ...page.app,
+    name: updates.name.trim(),
+    country: normalizeCountry(updates.country),
+  };
+  const updatedPage: CachedAppReviewPage = {
+    ...page,
+    app,
+    pagePath: buildAppPagePath(app),
+    canonicalUrl: buildCanonicalUrl(buildAppPagePath(app)),
+    updatedAt: new Date().toISOString(),
+  };
+  await atomicWriteJson(cacheFilePath(app.country, app.id), updatedPage);
+  if (normalizeCountry(currentCountry) !== app.country) {
+    await fs.unlink(cacheFilePath(currentCountry, appId)).catch(() => undefined);
+  }
+  return updatedPage;
+}
+
+export async function deleteCachedReviewPage(appId: string, country?: string): Promise<boolean> {
+  const page = await findCachedReviewPage(appId, country);
+  if (!page) return false;
+  await fs.unlink(cacheFilePath(page.app.country, page.app.id));
+  return true;
+}
+
+export function cachedPageToLegacyApp(page: CachedAppReviewPage): App {
+  return {
+    id: page.app.id,
+    name: page.app.name,
+    country: page.app.country,
+    lastFetched: page.updatedAt,
+  };
+}
+
+export function cachedPageToLegacyAnalysis(page: CachedAppReviewPage): AggregatedAnalysis {
+  const reviews = page.allReviews?.length ? page.allReviews : page.reviews;
+  const sentimentDistribution = reviews.reduce(
+    (distribution, review) => {
+      const rating = Number.parseInt(review.rating, 10) || 0;
+      if (rating >= 4) distribution.positive += 1;
+      else if (rating <= 2) distribution.negative += 1;
+      else distribution.neutral += 1;
+      return distribution;
+    },
+    { positive: 0, negative: 0, neutral: 0 }
+  );
+  const itemToIssue = (item: { title: string; summary: string; evidence?: string; reviewIds?: string[] }) => ({
+    issue: item.title,
+    count: item.reviewIds?.length || 1,
+    examples: item.evidence ? [item.evidence] : [item.summary],
+  });
+  const insightItems = page.insights;
+  const commonIssues = (insightItems?.painPoints || []).map(itemToIssue);
+  const suggestions = [
+    ...(insightItems?.opportunities || []),
+    ...(insightItems?.actionPlan || []),
+  ].map((item) => ({
+    suggestion: item.title,
+    count: item.reviewIds?.length || 1,
+    examples: item.evidence ? [item.evidence] : [item.summary],
+  }));
+
+  return {
+    appId: page.app.id,
+    totalReviews: page.stats.totalReviews,
+    sentimentDistribution,
+    commonIssues,
+    clusteredIssues: commonIssues.length > 0 ? [{
+      category: '评论洞察',
+      issues: commonIssues,
+      totalCount: commonIssues.reduce((sum, item) => sum + item.count, 0),
+    }] : [],
+    suggestions,
+    versionAnalysis: (page.diagnostics?.versionTrend || page.stats.versionDistribution.map((item) => ({
+      version: item.version,
+      reviewCount: item.count,
+      averageRating: item.averageRating,
+      negativeShare: 0,
+      positiveShare: 0,
+      negativeCount: 0,
+      neutralCount: 0,
+      positiveCount: 0,
+    }))).map((item) => ({
+      version: item.version,
+      reviewCount: item.reviewCount,
+      averageRating: item.averageRating,
+      sentimentDistribution: {
+        positive: item.positiveCount,
+        neutral: item.neutralCount,
+        negative: item.negativeCount,
+      },
+    })),
+    generatedAt: page.updatedAt,
+  };
+}
+
 export async function getFeaturedCachedApps(limit = 18): Promise<FeaturedAppSummary[]> {
   const apps = await getCachedAppSummaries();
   return Number.isFinite(limit) ? apps.slice(0, limit) : apps;
@@ -520,6 +638,8 @@ export async function generateCachedReviewPage(options: GenerateCachedReviewOpti
 
   const allReviews = sortReviewsByDateDesc(reviews).slice(0, maxReviews);
   const sortedReviews = sortReviewsForAnalysis(allReviews);
+  const reviewClusters = prepareReviewCorpus(allReviews);
+  const selectedClusters = reviewClusters.filter((cluster) => !cluster.flags.includes('spam-like')).slice(0, 100);
   const stats = summarizeReviews(allReviews);
   const sourceBreakdown = buildReviewSourceBreakdown(allReviews, country);
   let insights: ReviewMiningResponse | null = null;
@@ -534,14 +654,24 @@ export async function generateCachedReviewPage(options: GenerateCachedReviewOpti
         appName: resolution.app.name,
         country,
         stats,
-        reviews: sortedReviews.slice(0, 120).map((review) => ({
-          id: review.id,
-          title: review.title,
-          content: review.content,
-          rating: review.rating,
-          version: review.version,
-          updated: review.updated,
+        reviews: selectedClusters.map((cluster) => ({
+          id: cluster.representative.id,
+          title: cluster.representative.title,
+          content: cluster.representative.content,
+          rating: cluster.representative.rating,
+          version: cluster.representative.version,
+          updated: cluster.representative.updated,
+          clusterId: cluster.clusterId,
+          clusterCount: cluster.count,
+          uniqueReviewerCount: cluster.uniqueReviewerCount,
+          reviewIds: cluster.reviewIds,
         })),
+        corpusMeta: {
+          rawReviewCount: allReviews.length,
+          clusterCount: reviewClusters.length,
+          selectedClusterCount: selectedClusters.length,
+          excludedSpamCount: reviewClusters.filter((cluster) => cluster.flags.includes('spam-like')).length,
+        },
       });
     } catch (error) {
       console.error('Review mining failed:', error);
@@ -573,7 +703,10 @@ export async function generateCachedReviewPage(options: GenerateCachedReviewOpti
     maxReviews,
   };
 
-  await upsertReviewHistory(page.app, allReviews);
+  await upsertReviewHistory(page.app, allReviews, {
+    sourceUpdatedAt: page.updatedAt,
+    diagnostics: page.diagnostics,
+  });
   await atomicWriteJson(cacheFilePath(country, resolution.app.id), page);
   return { page, cached: false };
 }

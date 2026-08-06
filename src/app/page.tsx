@@ -6,6 +6,7 @@ import {
   TOP_CHART_COUNTRIES,
   fetchTopChartApps,
 } from '@/lib/appstore/top-charts';
+import { fetchHackerNewsSignals } from '@/lib/signals/hacker-news';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,10 @@ export default async function Page({ searchParams }: PageProps) {
     console.error('Failed to load initial top charts:', error);
     return [];
   });
+  const initialProductSignals = await fetchHackerNewsSignals().catch((error) => {
+    console.error('Failed to load Hacker News signals:', error);
+    return [];
+  });
 
   return (
     <AppReviewHome
@@ -66,6 +71,7 @@ export default async function Page({ searchParams }: PageProps) {
       topChartCountries={TOP_CHART_COUNTRIES}
       topChartCategories={TOP_CHART_CATEGORIES}
       initialTopChartApps={initialTopChartApps}
+      initialProductSignals={initialProductSignals}
     />
   );
 }

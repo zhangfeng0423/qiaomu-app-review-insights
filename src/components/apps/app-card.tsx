@@ -94,7 +94,7 @@ export function AppCard({
         {/* 状态信息 - 只对管理员显示技术细节 */}
         {isAdmin && (
           <div className="text-xs text-gray-500">
-            {stats?.totalReviews > 0 ? (
+            {stats && stats.totalReviews > 0 ? (
               <>已抓取 {stats.totalReviews} 条评论</>
             ) : (
               <>尚未抓取评论</>

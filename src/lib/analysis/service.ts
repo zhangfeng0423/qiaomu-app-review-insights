@@ -1,6 +1,6 @@
 import { getStorage } from '@/lib/storage';
-import { KimiClient, AnalysisRequest } from './kimi-client';
-import { AppStoreReview, AnalysisResult, AnalysisConfig, AggregatedAnalysis } from '@/types';
+import { KimiClient, AnalysisRequest, AnalysisResponse } from './kimi-client';
+import { AnalysisResult, AnalysisConfig, AggregatedAnalysis } from '@/types';
 
 export class AnalysisService {
   private storage = getStorage();
@@ -46,7 +46,6 @@ export class AnalysisService {
   ): Promise<AnalysisResult[]> {
     const {
       promptTemplateId = 'default',
-      batchSize = 5,
       includeAnalyzed = false,
     } = config;
 
@@ -99,7 +98,7 @@ export class AnalysisService {
     console.log(`Prepared ${analysisRequests.length} analysis requests with optimized data`);
 
     // 根据评论数量选择分析策略
-    let analysisResponses: any[];
+    let analysisResponses: AnalysisResponse[];
 
     if (analysisRequests.length > 100) {
       // 大规模分析：使用并发批处理
@@ -204,8 +203,8 @@ export class AnalysisService {
 
   /** 标准化建议短语：去噪、裁剪、同义归一 */
   private normalizeSuggestion(s: string): string | null {
-    if (!s && s !== 0 as any) return null;
-    let t = this.normalizePhrase(s as any);
+    if (!s) return null;
+    let t = this.normalizePhrase(s);
     if (!t) return null;
     // 停用词/口水词
     const stop = ['建议', '优化', '改进', '希望', '希望可以', '请', '谢谢', 'Amazing', 'Great', 'Nice'];
@@ -220,7 +219,7 @@ export class AnalysisService {
   }
 
   /** 标准化通用短语：去表情/空白、限制长度、中文化引号 */
-  private normalizePhrase(s: any): string | null {
+  private normalizePhrase(s: unknown): string | null {
     // 强制转字符串，避免 (s || '').replace 报错
     let t = String(s ?? '')
       .replace(/\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu, '')
@@ -231,8 +230,8 @@ export class AnalysisService {
     return t;
   }
 
-  private normalizeVersionRef(s: any): string | null {
-    let t = String(s ?? '').trim();
+  private normalizeVersionRef(s: unknown): string | null {
+    const t = String(s ?? '').trim();
     if (!t) return null;
     // 只保留形如 1.2.3 或 iOS 17 等
     if (/^\d+(\.\d+){0,2}$/.test(t)) return t;
@@ -346,7 +345,7 @@ export class AnalysisService {
 
     // 构建结果，只返回有问题的类别
     return Array.from(clusteredIssues.entries())
-      .filter(([_, issues]) => issues.length > 0)
+      .filter(([, issues]) => issues.length > 0)
       .map(([category, issues]) => ({
         category,
         issues: issues.sort((a, b) => b.count - a.count),
@@ -528,7 +527,7 @@ export class AnalysisService {
       }
 
       return 0;
-    } catch (error) {
+    } catch {
       // 如果解析失败，使用字符串比较
       return a.localeCompare(b);
     }
@@ -573,7 +572,7 @@ export class AnalysisService {
     error?: string;
   }> {
     try {
-      const kimiAvailable = await this.kimiClient.testConnection();
+      const kimiAvailable = await this.getKimi().testConnection();
       const promptTemplates = await this.storage.getPromptTemplates();
       
       return {

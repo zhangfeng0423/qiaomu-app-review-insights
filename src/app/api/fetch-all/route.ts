@@ -17,6 +17,7 @@ interface FetchAllResult {
 // POST /api/fetch-all - 批量抓取所有应用的评论
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<FetchAllResult>>> {
   try {
+    void request;
     console.log('Starting batch fetch for all apps');
 
     const result = await appStoreService.fetchAllAppsReviews(true);

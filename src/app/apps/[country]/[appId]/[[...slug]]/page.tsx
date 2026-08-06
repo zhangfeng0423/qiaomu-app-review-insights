@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { AlertCircle, Apple, ArrowLeft, ArrowUpRight, Lightbulb, Star, Target, TrendingDown } from 'lucide-react';
 import { InsightGrid } from '@/components/app-review/insight-cards';
 import { RegenerateButton } from '@/components/app-review/regenerate-button';
 import { BrandMark, SiteFooter } from '@/components/app-review/site-footer';
 import { ReviewSourceBreakdownPanel, reviewSourceLabel } from '@/components/app-review/source-breakdown';
 import { VersionDiagnosticsPanel } from '@/components/app-review/version-diagnostics';
+import { ResearchHistoryPanel } from '@/components/app-review/research-history';
+import { CountryComparisonPanel } from '@/components/app-review/country-comparison';
 import {
   CachedAppReviewPage,
   buildAppPagePath,
@@ -16,6 +19,9 @@ import {
 } from '@/lib/appstore/cache';
 import { buildReviewDiagnostics } from '@/lib/appstore/diagnostics';
 import { normalizeCountry } from '@/lib/appstore/discovery';
+import { detectResearchChanges } from '@/lib/appstore/research-history';
+import { getReviewHistory } from '@/lib/appstore/review-history';
+import { getCountryResearchComparison } from '@/lib/appstore/country-comparison';
 
 export const runtime = 'nodejs';
 export const revalidate = 3600;
@@ -121,6 +127,9 @@ export default async function AppInsightPage({ params }: PageProps) {
   const page = await getPage(country, appId);
   const insights = hasMeaningfulInsights(page.insights) ? page.insights : null;
   const diagnostics = page.diagnostics || buildReviewDiagnostics(page.reviews);
+  const historySnapshots = await getReviewHistory(page.app.country, page.app.id);
+  const historyChanges = detectResearchChanges(historySnapshots);
+  const countryComparison = await getCountryResearchComparison(page.app.id);
   const maxBucket = maxRatingBucket(page);
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -179,9 +188,12 @@ export default async function AppInsightPage({ params }: PageProps) {
           <div className="min-w-0">
             <div className="flex min-w-0 gap-4">
               {page.app.artworkUrl ? (
-                <img
+                <Image
                   src={page.app.artworkUrl}
                   alt={`${page.app.name} icon`}
+                  width={80}
+                  height={80}
+                  unoptimized
                   className="h-20 w-20 shrink-0 rounded-2xl border border-zinc-200 bg-white object-cover shadow-sm"
                 />
               ) : (
@@ -288,6 +300,10 @@ export default async function AppInsightPage({ params }: PageProps) {
       </section>
 
       <VersionDiagnosticsPanel diagnostics={diagnostics} appName={page.app.name} />
+
+      <ResearchHistoryPanel snapshots={historySnapshots} changes={historyChanges} />
+
+      <CountryComparisonPanel comparison={countryComparison} />
 
       {insights ? (
         <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">

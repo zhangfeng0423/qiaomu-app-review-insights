@@ -96,7 +96,7 @@ export function ClusteredIssues({ data, title = "问题分类分析" }: Clustere
                               <div className="text-xs text-gray-500">相关评论示例:</div>
                               {issue.examples.slice(0, 2).map((example, exampleIndex) => (
                                 <div key={exampleIndex} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                                  "{example}"
+                                  &quot;{example}&quot;
                                 </div>
                               ))}
                             </div>

@@ -15,8 +15,9 @@
     "dev:webpack:6000": "next dev --port 6000",
     "dev:webpack:7000": "next dev --port 7000",
     "build": "next build --turbopack",
-    "start": "next start",
-    "start:3000": "next start --port 3000",
+    "start": "HOSTNAME=0.0.0.0 PORT=3000 node .next/standalone/server.js",
+    "start:standalone": "HOSTNAME=0.0.0.0 PORT=3000 node .next/standalone/server.js",
+    "start:3000": "HOSTNAME=0.0.0.0 PORT=3000 node .next/standalone/server.js",
     "start:4000": "next start --port 4000",
     "start:5000": "next start --port 5000",
     "lint": "eslint"

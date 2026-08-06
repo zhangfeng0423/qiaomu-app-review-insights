@@ -7,6 +7,8 @@ export interface AiInsights {
   topSuggestions: Array<{ title: string; summary: string; examples: Array<{ id: string; snippet: string }> }>;
 }
 
+type IssueCategory = AiInsights['issueTaxonomy'][number];
+
 export class AiInsightsService {
   private storage = getStorage();
   private kimiClient: KimiClient | null = null;
@@ -66,8 +68,8 @@ export class AiInsightsService {
 
     const issueTaxonomy = Array.from(tax.values())
       .sort((a, b) => b.count - a.count)
-      .reduce((acc: any[], cur) => {
-        let cat = acc.find(x => x.category === cur.category);
+      .reduce<IssueCategory[]>((acc, cur) => {
+        let cat = acc.find((item) => item.category === cur.category);
         if (!cat) { cat = { category: cur.category, items: [] }; acc.push(cat); }
         cat.items.push({ title: cur.title, summary: cur.summary, examples: cur.examples });
         return acc;

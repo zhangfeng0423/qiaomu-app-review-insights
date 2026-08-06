@@ -69,7 +69,7 @@ export function SuggestionsList({ data, title = "改进建议", maxItems = 10 }:
                         <div className="space-y-1">
                           {item.examples.slice(0, 2).map((example, exampleIndex) => (
                             <div key={exampleIndex} className="text-xs text-gray-600 bg-white p-2 rounded border">
-                              "{example}"
+                              &quot;{example}&quot;
                             </div>
                           ))}
                         </div>

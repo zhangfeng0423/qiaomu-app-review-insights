@@ -7,10 +7,10 @@ const storage = getStorage();
 // POST /api/prompts/[id]/activate - 激活指定的 Prompt 模板
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<Record<string, never>>>> {
   try {
-    const { id } = params;
+    const { id } = await params;
     const prompts = await storage.getPromptTemplates();
     const targetPrompt = prompts.find(p => p.id === id);
     
@@ -47,14 +47,10 @@ export async function POST(
       updatedAt: new Date().toISOString(),
     };
 
-    // 保存所有更新的模板
-    for (const prompt of updatedPrompts) {
-      if (prompt.id === id) {
-        await storage.savePromptTemplate(activatedPrompt);
-      } else {
-        await storage.savePromptTemplate(prompt);
-      }
-    }
+    // 一次性保存，确保所有存储后端行为一致
+    await storage.savePromptTemplates(updatedPrompts.map((prompt) => (
+      prompt.id === id ? activatedPrompt : prompt
+    )));
     
     console.log(`Activated prompt template: ${activatedPrompt.name} (${id})`);
 

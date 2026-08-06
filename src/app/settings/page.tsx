@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,12 +32,7 @@ export default function SettingsPage() {
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-    loadPrompts();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       // 从环境变量或配置文件加载设置
@@ -51,9 +46,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadPrompts = async () => {
+  const loadPrompts = useCallback(async () => {
     try {
       const response = await fetch('/api/prompts');
       if (response.ok) {
@@ -70,7 +65,12 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Failed to load prompts:', error);
     }
-  };
+  }, [selectedPrompt]);
+
+  useEffect(() => {
+    void loadSettings();
+    void loadPrompts();
+  }, [loadSettings, loadPrompts]);
 
   const handleSaveModelConfig = async () => {
     try {

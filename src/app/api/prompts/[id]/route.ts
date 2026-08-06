@@ -7,10 +7,10 @@ const storage = getStorage();
 // GET /api/prompts/[id] - 获取指定 Prompt 模板
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<PromptTemplate>>> {
   try {
-    const { id } = params;
+    const { id } = await params;
     const prompts = await storage.getPromptTemplates();
     const prompt = prompts.find(p => p.id === id);
     
@@ -44,10 +44,10 @@ export async function GET(
 // PUT /api/prompts/[id] - 更新 Prompt 模板
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<PromptTemplate>>> {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     
     // 验证必需字段
@@ -93,7 +93,9 @@ export async function PUT(
       updatedAt: new Date().toISOString(),
     };
 
-    await storage.savePromptTemplate(updatedPrompt);
+    await storage.savePromptTemplates(prompts.map((prompt) => (
+      prompt.id === id ? updatedPrompt : prompt
+    )));
     
     console.log(`Updated prompt template: ${updatedPrompt.name} (${updatedPrompt.id})`);
 
@@ -118,10 +120,10 @@ export async function PUT(
 // DELETE /api/prompts/[id] - 删除 Prompt 模板
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<Record<string, never>>>> {
   try {
-    const { id } = params;
+    const { id } = await params;
     const prompts = await storage.getPromptTemplates();
     const prompt = prompts.find(p => p.id === id);
     
@@ -145,7 +147,7 @@ export async function DELETE(
       );
     }
 
-    await storage.deletePromptTemplate(id);
+    await storage.savePromptTemplates(prompts.filter((item) => item.id !== id));
     
     console.log(`Deleted prompt template: ${prompt.name} (${id})`);
 

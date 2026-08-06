@@ -12,6 +12,7 @@ const DEFAULT_FRESH_DAYS = 3;
 interface DailyClientState {
   generatedAppKeys: string[];
   queuedAppKeys: string[];
+  refreshedAppAt?: Record<string, string>;
   updatedAt: string;
 }
 
@@ -56,6 +57,12 @@ function dailyLimit() {
   const parsed = Number.parseInt(process.env.APP_REVIEW_PUBLIC_DAILY_NEW_APP_LIMIT || '', 10);
   if (!Number.isFinite(parsed)) return DEFAULT_DAILY_LIMIT;
   return Math.max(0, parsed);
+}
+
+function refreshIntervalMs() {
+  const parsed = Number.parseInt(process.env.APP_REVIEW_PUBLIC_REFRESH_INTERVAL_MINUTES || '', 10);
+  const minutes = Number.isFinite(parsed) ? Math.max(1, parsed) : 15;
+  return minutes * 60 * 1000;
 }
 
 export function publicCacheFreshDays() {
@@ -144,6 +151,7 @@ function getClientState(state: DailyGenerationState, clientKey: string) {
   };
   state.clients[clientKey].generatedAppKeys ||= [];
   state.clients[clientKey].queuedAppKeys ||= [];
+  state.clients[clientKey].refreshedAppAt ||= {};
   return state.clients[clientKey];
 }
 
@@ -212,6 +220,30 @@ export async function queuePublicGeneration(
   })}\n`, 'utf8');
 
   return limitInfo(client, dailyLimit(), day);
+}
+
+export async function reservePublicRefresh(request: NextRequest, appKey: string) {
+  const day = dayKey();
+  const clientKey = clientGenerationKey(request);
+  const state = await readDailyState(day);
+  const client = getClientState(state, clientKey);
+  const lastRefreshedAt = client.refreshedAppAt?.[appKey];
+  const lastTime = lastRefreshedAt ? new Date(lastRefreshedAt).getTime() : 0;
+  const elapsed = Date.now() - lastTime;
+  const interval = refreshIntervalMs();
+
+  if (lastTime && elapsed < interval) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.ceil((interval - elapsed) / 1000),
+    };
+  }
+
+  client.refreshedAppAt![appKey] = new Date().toISOString();
+  client.updatedAt = new Date().toISOString();
+  await writeDailyState(state);
+
+  return { allowed: true, retryAfterSeconds: 0 };
 }
 
 export function hasInFlightGeneration(appKey: string) {

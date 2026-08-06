@@ -66,7 +66,8 @@ export async function POST(
       updatedAt: new Date().toISOString(),
     };
 
-    await storage.savePromptTemplate(newPrompt);
+    const prompts = await storage.getPromptTemplates();
+    await storage.savePromptTemplates([...prompts, newPrompt]);
     
     console.log(`Created new prompt template: ${newPrompt.name} (${newPrompt.id})`);
 

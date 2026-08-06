@@ -28,7 +28,7 @@ export function PromptList({
     return (
       <div className="text-center py-8 text-gray-500">
         <p>暂无 Prompt 模板</p>
-        <p className="text-sm mt-1">点击"新建模板"创建第一个模板</p>
+        <p className="text-sm mt-1">点击 &quot;新建模板&quot; 创建第一个模板</p>
       </div>
     );
   }

@@ -1,9 +1,14 @@
 import { BaseStorage } from './base';
 import { App, AppStoreReview, AnalysisResult, PromptTemplate } from '@/types';
 
+interface KVClient {
+  get<T>(key: string): Promise<T | null>;
+  set(key: string, value: unknown): Promise<unknown>;
+}
+
 // Vercel KV 存储实现
 export class VercelKVStorage extends BaseStorage {
-  private kv: any;
+  private kv: KVClient | null = null;
 
   constructor() {
     super();
@@ -15,7 +20,7 @@ export class VercelKVStorage extends BaseStorage {
     try {
       const { kv } = await import('@vercel/kv');
       this.kv = kv;
-    } catch (error) {
+    } catch {
       console.warn('Vercel KV not available, falling back to local storage');
       throw new Error('Vercel KV not available');
     }
@@ -27,54 +32,72 @@ export class VercelKVStorage extends BaseStorage {
     }
   }
 
+  private getKV(): KVClient {
+    if (!this.kv) throw new Error('Vercel KV not available');
+    return this.kv;
+  }
+
   async getApps(): Promise<App[]> {
     await this.ensureKV();
-    const apps = await this.kv.get('apps');
+    const apps = await this.getKV().get<App[]>('apps');
     return apps || [];
   }
 
   async saveApps(apps: App[]): Promise<void> {
     await this.ensureKV();
-    await this.kv.set('apps', apps);
+    await this.getKV().set('apps', apps);
   }
 
   async getReviews(appId?: string): Promise<AppStoreReview[]> {
     await this.ensureKV();
-    const allReviews = await this.kv.get('reviews') || [];
+    const allReviews = await this.getKV().get<AppStoreReview[]>('reviews') || [];
     return this.filterByAppId(allReviews, appId);
+  }
+
+  async getReviewsPage(appId: string, offset: number, limit: number): Promise<AppStoreReview[]> {
+    const reviews = await this.getReviews(appId);
+    return reviews.slice(offset, offset + limit);
   }
 
   async saveReviews(reviews: AppStoreReview[]): Promise<void> {
     await this.ensureKV();
-    const existingReviews = await this.kv.get('reviews') || [];
+    const existingReviews = await this.getKV().get<AppStoreReview[]>('reviews') || [];
     const mergedReviews = this.mergeArrays(existingReviews, reviews);
     const sortedReviews = this.sortByDate(mergedReviews, 'updated');
-    await this.kv.set('reviews', sortedReviews);
+    await this.getKV().set('reviews', sortedReviews);
   }
 
   async getAnalysisResults(appId?: string): Promise<AnalysisResult[]> {
     await this.ensureKV();
-    const allResults = await this.kv.get('analysis') || [];
+    const allResults = await this.getKV().get<AnalysisResult[]>('analysis') || [];
     return this.filterByAppId(allResults, appId);
   }
 
   async saveAnalysisResults(results: AnalysisResult[]): Promise<void> {
     await this.ensureKV();
-    const existingResults = await this.kv.get('analysis') || [];
+    const existingResults = await this.getKV().get<AnalysisResult[]>('analysis') || [];
     const mergedResults = this.mergeArrays(existingResults, results);
     const sortedResults = this.sortByDate(mergedResults, 'analyzedAt');
-    await this.kv.set('analysis', sortedResults);
+    await this.getKV().set('analysis', sortedResults);
   }
 
   async getPromptTemplates(): Promise<PromptTemplate[]> {
     await this.ensureKV();
-    const templates = await this.kv.get('prompts');
+    const templates = await this.getKV().get<PromptTemplate[]>('prompts');
     
     if (!templates || templates.length === 0) {
       const defaultTemplate: PromptTemplate = {
         id: 'default',
         name: '默认分析模板',
         description: '通用的应用评论分析模板',
+        content: `请分析以下应用评论：
+
+标题：{title}
+内容：{content}
+评分：{rating}星
+版本：{version}
+
+请按照系统提示的格式返回分析结果。`,
         systemPrompt: `你是一个专业的应用评论分析师。请分析用户评论，提取关键信息。
 
 分析要求：
@@ -100,10 +123,11 @@ export class VercelKVStorage extends BaseStorage {
 请按照系统提示的格式返回分析结果。`,
         version: '1.0.0',
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         isActive: true
       };
       
-      await this.kv.set('prompts', [defaultTemplate]);
+      await this.getKV().set('prompts', [defaultTemplate]);
       return [defaultTemplate];
     }
     
@@ -112,6 +136,6 @@ export class VercelKVStorage extends BaseStorage {
 
   async savePromptTemplates(templates: PromptTemplate[]): Promise<void> {
     await this.ensureKV();
-    await this.kv.set('prompts', templates);
+    await this.getKV().set('prompts', templates);
   }
 }

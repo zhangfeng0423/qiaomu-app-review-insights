@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PromptTemplate } from '@/types';
 import { PromptEditor } from '@/components/prompts/prompt-editor';
 import { PromptList } from '@/components/prompts/prompt-list';
@@ -15,11 +15,7 @@ export default function PromptsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadPrompts();
-  }, []);
-
-  const loadPrompts = async () => {
+  const loadPrompts = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/prompts');
@@ -40,7 +36,11 @@ export default function PromptsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedPrompt]);
+
+  useEffect(() => {
+    void loadPrompts();
+  }, [loadPrompts]);
 
   const handleCreateNew = () => {
     const newPrompt: PromptTemplate = {

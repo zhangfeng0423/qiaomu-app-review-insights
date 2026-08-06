@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { ArrowUpRight, Bot, ChevronsUpDown, Loader2, RefreshCw, Trophy } from 'lucide-react';
 import { RewardSupportDialog } from '@/components/app-review/site-footer';
 import { Button } from '@/components/ui/button';
@@ -241,7 +242,7 @@ export function TopChartsSection({ countries, categories, initialApps }: TopChar
               <div className="text-center text-lg font-semibold text-zinc-400">#{app.rank}</div>
               <div className="flex min-w-0 gap-3">
                 {app.artworkUrl ? (
-                  <img src={app.artworkUrl} alt={`${app.name} icon`} className="h-12 w-12 shrink-0 rounded-lg border border-zinc-200 bg-white object-cover" />
+                  <Image src={app.artworkUrl} alt={`${app.name} icon`} width={48} height={48} unoptimized className="h-12 w-12 shrink-0 rounded-lg border border-zinc-200 bg-white object-cover" />
                 ) : (
                   <div className="h-12 w-12 shrink-0 rounded-lg bg-zinc-100" />
                 )}

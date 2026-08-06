@@ -1,10 +1,11 @@
 import { getStorage } from '@/lib/storage';
 import { KimiClient, ThemeItem } from './kimi-client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-async function createSupabase() {
+async function createSupabase(): Promise<SupabaseClient | null> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) return null as any;
+  if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
   return createClient(url, key);
 }
@@ -32,8 +33,8 @@ export class ThemesService {
         const probe = await supabase.from('ai_insights').select('payload').eq('app_id', appId).eq('kind', 'themes_both').limit(1);
         if (!probe.error) tableAvailable = true;
         if (tableAvailable && probe.data && probe.data[0]) {
-          const payload = probe.data[0].payload || {};
-          if (payload.positive && payload.negative) return payload as any;
+          const payload = probe.data[0].payload as { positive?: ThemeItem[]; negative?: ThemeItem[] } | null;
+          if (payload?.positive && payload.negative) return payload as { positive: ThemeItem[]; negative: ThemeItem[] };
         }
       } catch {}
     }
@@ -74,7 +75,10 @@ export class ThemesService {
           }
         }
       }
-      const arrOut = Array.from(pool.values()).sort((a, b) => b.count - a.count).slice(0, 5).map(({ count, ...rest }) => rest);
+      const arrOut = Array.from(pool.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map((item) => Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'count')) as ThemeItem);
       return arrOut;
     };
 

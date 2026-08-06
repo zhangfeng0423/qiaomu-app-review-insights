@@ -17,6 +17,7 @@ interface AnalyzeAllResult {
 // POST /api/analyze-all - 批量分析所有应用的评论
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<AnalyzeAllResult>>> {
   try {
+    void request;
     console.log('Starting batch analysis for all apps');
 
     const result = await analysisService.analyzeAllAppsReviews({
