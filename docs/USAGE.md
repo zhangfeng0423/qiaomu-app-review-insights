@@ -300,6 +300,15 @@ curl "http://localhost:3000/api/research/compare?appId=6448311069"
 /api/apps/{appId}/export-report?format=summary
 ```
 
+旧版 `/api/apps/{appId}/...` 兼容接口支持 `country` 查询参数，例如：
+
+```text
+/api/apps/6448311069/reviews?country=us
+/api/apps/6448311069/generate-analysis?country=us
+```
+
+读取接口未提供 `country` 时会兼容返回最近更新的地区；写入接口在同一个 App 存在多个地区缓存、但请求未提供 `country` 时会返回 `409`，避免更新错地区。
+
 ## 7. 目前没有的功能
 
 为了避免把当前能力和规划混在一起，以下功能目前还没有正式接入：

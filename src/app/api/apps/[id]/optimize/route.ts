@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
 import { ApiResponse } from '@/types';
+import { ambiguousCachedPageResponse, resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 interface OptimizeResult {
   reviewsCount: number;
@@ -15,9 +15,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<OptimizeResult>>> {
   try {
-    void request;
     const { id } = await params;
-    const page = await findCachedReviewPage(id);
+    const pageResolution = await resolveCachedPageForRequest(request, id, 'write');
+    if (pageResolution.status === 'ambiguous') return ambiguousCachedPageResponse(pageResolution);
+    const page = pageResolution.page;
     if (!page) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const reviews = page.allReviews?.length ? page.allReviews : page.reviews;

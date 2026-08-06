@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cachedPageToLegacyAnalysis, cachedPageToLegacyApp, findCachedReviewPage } from '@/lib/appstore/cache';
+import { cachedPageToLegacyAnalysis, cachedPageToLegacyApp } from '@/lib/appstore/cache';
 import { ReportGenerator } from '@/lib/report/generator';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 // GET /api/apps/[id]/export-report - 导出分析报告
 export async function GET(
@@ -12,7 +13,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format') || 'markdown'; // markdown, html, summary
     
-    const page = await findCachedReviewPage(id);
+    const page = (await resolveCachedPageForRequest(request, id, 'read')).page;
     if (!page) {
       return NextResponse.json(
         { error: '应用不存在' },

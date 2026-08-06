@@ -20,6 +20,7 @@ export function ReportPreview({ app, analysis }: ReportPreviewProps) {
   const [selectedFormat, setSelectedFormat] = useState<ReportFormat>('markdown');
   const [previewContent, setPreviewContent] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
+  const countryQuery = `country=${encodeURIComponent(app.country)}`;
 
   const formats = [
     { key: 'markdown' as ReportFormat, label: 'Markdown', icon: FileText, description: '完整的分析报告，适合技术文档' },
@@ -49,7 +50,7 @@ export function ReportPreview({ app, analysis }: ReportPreviewProps) {
 
   const downloadReport = async (format: ReportFormat) => {
     try {
-      const response = await fetch(`/api/apps/${app.id}/export-report?format=${format}`);
+      const response = await fetch(`/api/apps/${app.id}/export-report?format=${format}&${countryQuery}`);
       
       if (response.ok) {
         const blob = await response.blob();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cachedPageToLegacyApp, deleteCachedReviewPage, findCachedReviewPage, updateCachedReviewPageMetadata } from '@/lib/appstore/cache';
+import { cachedPageToLegacyApp, deleteCachedReviewPage, updateCachedReviewPageMetadata } from '@/lib/appstore/cache';
+import { ambiguousCachedPageResponse, resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 import { App, ApiResponse } from '@/types';
 
 // GET /api/apps/[id] - 获取单个应用
@@ -8,9 +9,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<App>>> {
   try {
-    void request;
     const { id } = await params;
-    const cachedPage = await findCachedReviewPage(id);
+    const cachedPage = (await resolveCachedPageForRequest(request, id, 'read')).page;
     if (cachedPage) {
       return NextResponse.json({
         success: true,
@@ -63,7 +63,9 @@ export async function PUT(
       );
     }
 
-    const currentPage = await findCachedReviewPage(id);
+    const pageResolution = await resolveCachedPageForRequest(request, id, 'write');
+    if (pageResolution.status === 'ambiguous') return ambiguousCachedPageResponse(pageResolution);
+    const currentPage = pageResolution.page;
     if (!currentPage) {
       return NextResponse.json(
         {
@@ -105,9 +107,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<ApiResponse<null>>> {
   try {
-    void request;
     const { id } = await params;
-    const deleted = await deleteCachedReviewPage(id);
+    const pageResolution = await resolveCachedPageForRequest(request, id, 'write');
+    if (pageResolution.status === 'ambiguous') return ambiguousCachedPageResponse(pageResolution);
+    const deleted = pageResolution.page
+      ? await deleteCachedReviewPage(id, pageResolution.page.app.country)
+      : false;
     if (!deleted) {
       return NextResponse.json(
         {

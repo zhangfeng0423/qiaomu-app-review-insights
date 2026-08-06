@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage, generateCachedReviewPage } from '@/lib/appstore/cache';
+import { generateCachedReviewPage } from '@/lib/appstore/cache';
+import { ambiguousCachedPageResponse, resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 interface SyncResult {
   fetchResult: { reviewCount: number; message: string };
@@ -14,7 +15,9 @@ export async function POST(
   try {
     const { id } = await params;
     const startTime = Date.now();
-    const existing = await findCachedReviewPage(id);
+    const resolution = await resolveCachedPageForRequest(_request, id, 'write');
+    if (resolution.status === 'ambiguous') return ambiguousCachedPageResponse(resolution);
+    const existing = resolution.page;
     if (!existing) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const generated = await generateCachedReviewPage({

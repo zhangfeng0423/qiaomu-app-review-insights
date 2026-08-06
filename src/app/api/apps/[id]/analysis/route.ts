@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cachedPageToLegacyAnalysis, findCachedReviewPage } from '@/lib/appstore/cache';
+import { cachedPageToLegacyAnalysis } from '@/lib/appstore/cache';
 import { ApiResponse, AggregatedAnalysis } from '@/types';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 // GET /api/apps/[id]/analysis - 获取聚合分析结果
 // Note: `params` is provided synchronously by Next.js route handlers
@@ -10,7 +11,7 @@ export async function GET(
 ): Promise<NextResponse<ApiResponse<{ analysis: AggregatedAnalysis | null }>>> {
   try {
     const { id } = await params;
-    const cachedPage = await findCachedReviewPage(id);
+    const cachedPage = (await resolveCachedPageForRequest(request, id, 'read')).page;
     if (!cachedPage) {
       return NextResponse.json(
         {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
+import { ambiguousCachedPageResponse, resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 // POST /api/apps/[id]/analyze-page?offset=0&limit=50
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -8,7 +8,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const url = new URL(request.url);
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '50')));
-    const page = await findCachedReviewPage(id);
+    const pageResolution = await resolveCachedPageForRequest(request, id, 'write');
+    if (pageResolution.status === 'ambiguous') return ambiguousCachedPageResponse(pageResolution);
+    const page = pageResolution.page;
     if (!page) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const reviews = page.allReviews?.length ? page.allReviews : page.reviews;

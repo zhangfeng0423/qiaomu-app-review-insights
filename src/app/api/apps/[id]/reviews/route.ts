@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 import { ApiResponse, AppStoreReview, AnalysisResult } from '@/types';
 
 interface ReviewsResponse {
@@ -16,7 +16,7 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10));
   const limit = Math.max(1, Number.parseInt(searchParams.get('limit') || '20', 10));
-  const cachedPage = await findCachedReviewPage(id);
+  const cachedPage = (await resolveCachedPageForRequest(request, id, 'read')).page;
   if (!cachedPage) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
   const allReviews = cachedPage.allReviews?.length ? cachedPage.allReviews : cachedPage.reviews;

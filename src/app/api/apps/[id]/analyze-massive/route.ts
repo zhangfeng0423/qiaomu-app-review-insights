@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage, generateCachedReviewPage } from '@/lib/appstore/cache';
+import { generateCachedReviewPage } from '@/lib/appstore/cache';
+import { ambiguousCachedPageResponse, resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 interface AnalyzeResult {
   analyzedCount: number;
@@ -17,10 +18,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    void request;
     const { id } = await params;
     const startTime = Date.now();
-    const existing = await findCachedReviewPage(id);
+    const resolution = await resolveCachedPageForRequest(request, id, 'write');
+    if (resolution.status === 'ambiguous') return ambiguousCachedPageResponse(resolution);
+    const existing = resolution.page;
     if (!existing) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const generated = await generateCachedReviewPage({

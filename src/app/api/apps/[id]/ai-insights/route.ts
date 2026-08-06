@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
 import { AiInsights } from '@/lib/analysis/ai-insights-service';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 function exampleFor(item: { evidence?: string; summary: string; reviewIds?: string[] }) {
   return (item.reviewIds || []).slice(0, 2).map((id) => ({
@@ -13,7 +13,7 @@ function exampleFor(item: { evidence?: string; summary: string; reviewIds?: stri
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const page = await findCachedReviewPage(id);
+    const page = (await resolveCachedPageForRequest(request, id, 'read')).page;
     if (!page) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const insights = page.insights;

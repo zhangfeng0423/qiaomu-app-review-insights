@@ -1,4 +1,4 @@
-import { ReviewHistorySnapshot } from '@/lib/appstore/review-history';
+import type { ReviewHistorySnapshot } from '@/lib/appstore/review-history';
 
 export type ResearchChangeSeverity = 'high' | 'medium' | 'low';
 export type ResearchChangeType = 'rating-drop' | 'negative-spike' | 'new-theme' | 'version-risk';

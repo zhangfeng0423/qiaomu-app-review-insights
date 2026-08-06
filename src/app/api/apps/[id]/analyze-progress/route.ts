@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  void request;
   const { id } = await params;
-  const cachedPage = await findCachedReviewPage(id);
+  const cachedPage = (await resolveCachedPageForRequest(request, id, 'read')).page;
   if (!cachedPage) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
   const total = cachedPage.stats.totalReviews;
   const analyzed = cachedPage.insights ? total : 0;

@@ -33,11 +33,12 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
   const [themes, setThemes] = useState<{ positive: ThemeItem[]; negative: ThemeItem[] } | null>(null);
   const [trends, setTrends] = useState<string[] | null>(null);
   const [, setAiInsights] = useState<AiInsights | null>(null);
+  const countryQuery = `country=${encodeURIComponent(app.country)}`;
 
   const loadAnalysis = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/apps/${app.id}/analysis`);
+      const response = await fetch(`/api/apps/${app.id}/analysis?${countryQuery}`);
       if (response.ok) {
         const data = await response.json();
         console.log('Analysis API response:', data); // 调试日志
@@ -51,12 +52,12 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [app.id]);
+  }, [app.id, countryQuery]);
 
   const generateAnalysis = async () => {
     try {
       setGenerating(true);
-      const response = await fetch(`/api/apps/${app.id}/generate-analysis`, {
+      const response = await fetch(`/api/apps/${app.id}/generate-analysis?${countryQuery}`, {
         method: 'POST',
       });
 
@@ -78,7 +79,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
 
   const exportReport = async () => {
     try {
-      const response = await fetch(`/api/apps/${app.id}/export-report`);
+      const response = await fetch(`/api/apps/${app.id}/export-report?${countryQuery}`);
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
@@ -102,7 +103,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
   // 导出 CSV（与评论列表一致）
   const exportCSV = async () => {
     try {
-      const res = await fetch(`/api/apps/${app.id}/reviews?limit=10000`);
+      const res = await fetch(`/api/apps/${app.id}/reviews?limit=10000&${countryQuery}`);
       if (!res.ok) throw new Error('获取评论失败');
       const data = await res.json();
       const reviews = data.data?.reviews || [];
@@ -131,23 +132,23 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
 
   const loadProgress = useCallback(async () => {
     try {
-      const res = await fetch(`/api/apps/${app.id}/analyze-progress`);
+      const res = await fetch(`/api/apps/${app.id}/analyze-progress?${countryQuery}`);
       if (res.ok) {
         const data = await res.json();
         setProgress(data.data);
       }
     } catch {}
-  }, [app.id]);
+  }, [app.id, countryQuery]);
 
   const loadThemes = useCallback(async () => {
     try {
-      const res = await fetch(`/api/apps/${app.id}/ai-themes?max=300`);
+      const res = await fetch(`/api/apps/${app.id}/ai-themes?max=300&${countryQuery}`);
       if (res.ok) {
         const data = await res.json();
         setThemes(data.data);
         // 若仍为空，使用更大样本且强制重算
         if ((!data.data?.positive?.length) && (!data.data?.negative?.length)) {
-          const res2 = await fetch(`/api/apps/${app.id}/ai-themes?max=600&fresh=1`);
+          const res2 = await fetch(`/api/apps/${app.id}/ai-themes?max=600&fresh=1&${countryQuery}`);
           if (res2.ok) {
             const d2 = await res2.json();
             setThemes(d2.data);
@@ -155,27 +156,27 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         }
       }
     } catch {}
-  }, [app.id]);
+  }, [app.id, countryQuery]);
 
   const loadTrends = useCallback(async () => {
     try {
-      const res = await fetch(`/api/apps/${app.id}/ai-trends`);
+      const res = await fetch(`/api/apps/${app.id}/ai-trends?${countryQuery}`);
       if (res.ok) {
         const data = await res.json();
         setTrends(data.data?.bullets || []);
       }
     } catch {}
-  }, [app.id]);
+  }, [app.id, countryQuery]);
 
   const loadAiInsights = useCallback(async () => {
     try {
-      const res = await fetch(`/api/apps/${app.id}/ai-insights?max=500`);
+      const res = await fetch(`/api/apps/${app.id}/ai-insights?max=500&${countryQuery}`);
       if (res.ok) {
         const data = await res.json();
         setAiInsights(data.data);
         // 若为空，尝试一次更大样本重算
         if ((!data.data?.topSuggestions?.length && !data.data?.issueTaxonomy?.length)) {
-          const res2 = await fetch(`/api/apps/${app.id}/ai-insights?max=800`);
+          const res2 = await fetch(`/api/apps/${app.id}/ai-insights?max=800&${countryQuery}`);
           if (res2.ok) {
             const d2 = await res2.json();
             setAiInsights(d2.data);
@@ -183,7 +184,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
         }
       }
     } catch {}
-  }, [app.id]);
+  }, [app.id, countryQuery]);
 
   useEffect(() => {
     void loadAnalysis();
@@ -194,7 +195,7 @@ export function AnalysisDashboard({ app }: AnalysisDashboardProps) {
   }, [app.id, loadAiInsights, loadAnalysis, loadProgress, loadThemes, loadTrends]);
 
   const analyzeOnePage = async (offset: number) => {
-    const res = await fetch(`/api/apps/${app.id}/analyze-page?offset=${offset}&limit=${PAGE_SIZE}`, { method: 'POST' });
+    const res = await fetch(`/api/apps/${app.id}/analyze-page?offset=${offset}&limit=${PAGE_SIZE}&${countryQuery}`, { method: 'POST' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err?.error || '分页分析失败');

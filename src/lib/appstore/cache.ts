@@ -15,6 +15,7 @@ import { ReviewDiagnostics, buildReviewDiagnostics } from '@/lib/appstore/diagno
 import { upsertReviewHistory } from '@/lib/appstore/review-history';
 import { ReviewStats, sortReviewsForAnalysis, summarizeReviews } from '@/lib/appstore/review-summary';
 import { prepareReviewCorpus } from '@/lib/analysis/review-preprocessor';
+import { selectCachedPage, CachedPageSelectionOperation, CachedPageSelectionResult } from '@/lib/appstore/cached-page-selection';
 import { AggregatedAnalysis, App, AppReviewSource, AppStoreReview } from '@/types';
 
 export interface CachedModelInfo {
@@ -424,6 +425,14 @@ export async function findCachedReviewPage(appId: string, country?: string): Pro
   return pages
     .filter((page) => page.app.id === appId)
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] || null;
+}
+
+export async function resolveCachedReviewPage(
+  appId: string,
+  options: { country?: string; operation?: CachedPageSelectionOperation } = {}
+): Promise<CachedPageSelectionResult<CachedAppReviewPage>> {
+  const pages = (await listCachedReviewPages()).filter((page) => page.app.id === appId);
+  return selectCachedPage(pages, options);
 }
 
 export async function updateCachedReviewPageMetadata(

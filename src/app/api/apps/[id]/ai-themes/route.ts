@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
 import { ThemeItem } from '@/lib/analysis/kimi-client';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 function toThemeItem(item: { title: string; summary: string; evidence?: string; reviewIds?: string[] }): ThemeItem {
   const ids = item.reviewIds || [];
@@ -15,7 +15,7 @@ function toThemeItem(item: { title: string; summary: string; evidence?: string; 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const page = await findCachedReviewPage(id);
+    const page = (await resolveCachedPageForRequest(request, id, 'read')).page;
     if (!page) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const positive = (page.insights?.positiveSignals || []).map(toThemeItem).slice(0, 5);

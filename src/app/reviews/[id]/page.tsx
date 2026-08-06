@@ -25,17 +25,17 @@ export default function ReviewsPage() {
     try {
       setLoading(true);
 
-      // 并行加载应用信息和评论数据
-      const [appResponse, reviewsResponse] = await Promise.all([
-        fetch(`/api/apps/${appId}`),
-        fetch(`/api/apps/${appId}/reviews?page=${page}&limit=${limit}`),
-      ]);
+      const appResponse = await fetch(`/api/apps/${appId}`);
+      let country: string | undefined;
 
       if (appResponse.ok) {
         const appData = await appResponse.json();
         setApp(appData.data);
+        country = appData.data?.country;
       }
 
+      const countryQuery = country ? `&country=${encodeURIComponent(country)}` : '';
+      const reviewsResponse = await fetch(`/api/apps/${appId}/reviews?page=${page}&limit=${limit}${countryQuery}`);
       if (reviewsResponse.ok) {
         const reviewsData = await reviewsResponse.json();
         setReviews(reviewsData.data.reviews);

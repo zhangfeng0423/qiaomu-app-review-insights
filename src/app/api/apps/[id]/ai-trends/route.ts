@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { findCachedReviewPage } from '@/lib/appstore/cache';
+import { resolveCachedPageForRequest } from '@/lib/appstore/request-page';
 
 // GET /api/apps/[id]/ai-trends
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const page = await findCachedReviewPage(id);
+    const page = (await resolveCachedPageForRequest(request, id, 'read')).page;
     if (!page) return NextResponse.json({ success: false, error: '应用不存在' }, { status: 404 });
 
     const timeline = page.diagnostics?.sentimentTimeline || [];
