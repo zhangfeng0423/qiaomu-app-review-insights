@@ -2,29 +2,27 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   AlertCircle,
   Apple,
   ArrowUpRight,
   CheckCircle2,
   ChevronsUpDown,
+  Compass,
   Lightbulb,
   Loader2,
   Search,
   Star,
-  TrendingDown,
   X,
 } from 'lucide-react';
 import { InsightGrid } from '@/components/app-review/insight-cards';
-import { BrandMark, RewardSupportDialog, SiteAffordances, SiteFooter } from '@/components/app-review/site-footer';
+import { BrandMark, SiteAffordances, SiteFooter } from '@/components/app-review/site-footer';
 import {
   ReviewSourceBreakdown,
   ReviewSourceBreakdownPanel,
   reviewSourceLabel,
 } from '@/components/app-review/source-breakdown';
-import { TopChartsSection } from '@/components/app-review/top-charts-section';
-import ProductSignals from '@/components/app-review/product-signals';
-import { ProductSignal } from '@/lib/signals/types';
 import { AppStoreReview } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,38 +115,6 @@ interface FeaturedAppSummary {
   negativeShare: number;
   positiveShare: number;
   primaryGenreName?: string;
-}
-
-interface TopChartCountry {
-  value: string;
-  label: string;
-}
-
-interface TopChartCategory {
-  value: string;
-  label: string;
-  genre?: string;
-}
-
-interface TopChartApp {
-  rank: number;
-  id: string;
-  name: string;
-  artistName: string;
-  artworkUrl: string;
-  categoryName?: string;
-  appStoreUrl?: string;
-  country: string;
-  chart: 'free' | 'paid';
-  category: string;
-  cached?: {
-    pagePath: string;
-    updatedAt: string;
-    totalReviews: number;
-    averageRating: number;
-    negativeShare: number;
-    hasInsights: boolean;
-  };
 }
 
 interface ApiResponse<T> {
@@ -269,7 +235,7 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {pageApps.map((app) => (
-          <a
+          <Link
             key={`${app.country}-${app.id}`}
             href={app.pagePath}
             className="group flex min-w-0 gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
@@ -303,12 +269,12 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
               </div>
               <p className="mt-2 text-[11px] text-zinc-400">更新 {formatDate(app.updatedAt)}</p>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
       {totalPages > 1 ? (
         <nav className="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="App 分页">
-          <a
+          <Link
             href={pageHref(page - 1)}
             className={`rounded-md border px-3 py-2 text-sm transition ${
               page <= 1
@@ -317,13 +283,13 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
             }`}
           >
             上一页
-          </a>
+          </Link>
           {pageNumbers.map((item, index) => {
             const previous = pageNumbers[index - 1];
             return (
               <span key={item} className="inline-flex items-center gap-2">
                 {previous && item - previous > 1 ? <span className="text-sm text-zinc-400">...</span> : null}
-                <a
+                <Link
                   href={pageHref(item)}
                   aria-current={item === page ? 'page' : undefined}
                   className={`min-w-10 rounded-md border px-3 py-2 text-center text-sm transition ${
@@ -333,11 +299,11 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
                   }`}
                 >
                   {item}
-                </a>
+                </Link>
               </span>
             );
           })}
-          <a
+          <Link
             href={pageHref(page + 1)}
             className={`rounded-md border px-3 py-2 text-sm transition ${
               page >= totalPages
@@ -346,7 +312,7 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
             }`}
           >
             下一页
-          </a>
+          </Link>
         </nav>
       ) : null}
     </section>
@@ -356,26 +322,21 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
 export default function Home({
   featuredApps = [],
   initialCachePage = 1,
-  topChartCountries = [],
-  topChartCategories = [],
-  initialTopChartApps = [],
-  initialProductSignals = [],
+  initialQuery = '',
+  initialCountry = 'cn',
 }: {
   featuredApps?: FeaturedAppSummary[];
   initialCachePage?: number;
-  topChartCountries?: TopChartCountry[];
-  topChartCategories?: TopChartCategory[];
-  initialTopChartApps?: TopChartApp[];
-  initialProductSignals?: ProductSignal[];
+  initialQuery?: string;
+  initialCountry?: string;
 }) {
-  const [query, setQuery] = useState('ChatGPT');
-  const [country, setCountry] = useState('cn');
+  const [query, setQuery] = useState(initialQuery);
+  const [country, setCountry] = useState(initialCountry);
   const [maxReviews, setMaxReviews] = useState(160);
   const analyze = true;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<ResearchData | null>(null);
-  const [rewardOpen, setRewardOpen] = useState(false);
 
   const maxBucket = useMemo(() => result ? maxRatingBucket(result.stats) : 1, [result]);
   const visibleInsights = result?.insights && hasMeaningfulClientInsights(result.insights) ? result.insights : null;
@@ -396,16 +357,10 @@ export default function Home({
       const payload = await response.json() as ApiResponse<ResearchData>;
 
       if (!response.ok || !payload.success || !payload.data) {
-        if (response.status === 429) {
-          setRewardOpen(true);
-        }
         throw new Error(payload.error || '检索失败');
       }
 
       setResult(payload.data);
-      if (payload.data.generation?.status === 'queued') {
-        setRewardOpen(true);
-      }
     } catch (researchError) {
       setError(researchError instanceof Error ? researchError.message : '检索失败');
     } finally {
@@ -419,10 +374,10 @@ export default function Home({
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <BrandMark compact />
           <div className="flex items-center gap-2">
-            <a href="/opportunities" className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-700 transition hover:border-teal-300 hover:bg-teal-100">
-              <Lightbulb className="h-4 w-4" />
-              发现机会
-            </a>
+            <Link href="/discover" className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-950">
+              <Compass className="h-4 w-4" />
+              探索
+            </Link>
             <SiteAffordances subtle />
           </div>
         </div>
@@ -431,9 +386,21 @@ export default function Home({
       <section className="border-b border-zinc-200 bg-[#fdfdfb]">
         <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
           <div className="min-w-0">
-            <p className="max-w-3xl text-base leading-7 text-zinc-600">
-              搜索 App Store 应用，生成用户评价洞察页，提炼痛点、机会、版本风险和关键摘要。
+            <p className="text-sm font-medium text-teal-700">App Store 评论研究</p>
+            <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
+              从一个竞品 App，找到有证据的产品机会
+            </h1>
+            <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-600">
+              输入 App Store 链接或 ID，系统会抓取近期评论，提炼核心痛点、产品机会和版本风险，并保留每条结论对应的评论证据。
             </p>
+            <ol className="mt-5 grid gap-2 text-sm text-zinc-600 sm:grid-cols-3">
+              {['输入 App', '生成结构化洞察', '核对原文证据'].map((step, index) => (
+                <li key={step} className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-zinc-950 text-[11px] font-semibold text-white">{index + 1}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
             <form onSubmit={runResearch} className="mt-6 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_130px_118px_44px]">
                 <div className="relative min-w-0">
@@ -496,6 +463,15 @@ export default function Home({
                 <span>{error}</span>
               </div>
             ) : null}
+            {loading ? (
+              <div className="mt-3 flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800" role="status" aria-live="polite">
+                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                <div>
+                  <p className="font-medium">正在准备洞察报告</p>
+                  <p className="mt-1 text-sky-700">检查缓存与公开额度，然后抓取评论、整理证据并生成结构化结论。请不要重复提交。</p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -524,13 +500,13 @@ export default function Home({
                 </div>
                 {result.app.trackViewUrl ? (
                   <div className="flex flex-wrap gap-2">
-                    <a
+                    <Link
                       href={result.pageUrl}
                       className="inline-flex items-center justify-center gap-1 rounded-md bg-zinc-950 px-3 py-2 text-sm text-white transition hover:bg-zinc-800"
                     >
                       查看洞察页
                       <ArrowUpRight className="h-3.5 w-3.5" />
-                    </a>
+                    </Link>
                     <a
                       href={result.app.trackViewUrl}
                       target="_blank"
@@ -543,8 +519,8 @@ export default function Home({
                   </div>
                 ) : null}
               </div>
-              <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-800">
-                已{result.cached ? '找到已有' : '生成'}评价洞察页：<a href={result.pageUrl} className="font-semibold underline underline-offset-4">{result.pageUrl}</a>
+              <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${visibleInsights ? 'border-teal-100 bg-teal-50 text-teal-800' : result.aiError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-sky-200 bg-sky-50 text-sky-800'}`}>
+                {visibleInsights ? '洞察报告已就绪' : result.aiError ? '评论已抓取，AI 洞察未完成' : '评论数据已准备'}：<Link href={result.pageUrl} className="font-semibold underline underline-offset-4">查看稳定报告页</Link>
                 <span className="ml-2 text-teal-700">更新于 {formatFullDate(result.updatedAt)}</span>
               </div>
               {result.generation?.message ? (
@@ -692,34 +668,39 @@ export default function Home({
         </section>
       ) : (
         <>
-          <ProductSignals signals={initialProductSignals} />
-          <TopChartsSection
-            countries={topChartCountries}
-            categories={topChartCategories}
-            initialApps={initialTopChartApps}
-          />
           <FeaturedApps apps={featuredApps} currentPage={initialCachePage} />
-          <section className="mx-auto grid max-w-7xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-3 lg:px-8">
-            <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-              <TrendingDown className="h-5 w-5 text-rose-600" />
-              <h2 className="mt-3 text-base font-semibold text-zinc-950">差评聚类</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">把抱怨压缩成可验证主题，保留原文证据。</p>
+          <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-950">研究能力</h2>
+                <p className="mt-1 text-sm text-zinc-500">先完成单个 App 的证据闭环，再进入机会库做跨 App 研究。</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-teal-700">
+                <Link href="/discover" className="hover:text-teal-900">探索榜单与外部信号 →</Link>
+                <Link href="/opportunities" className="hover:text-teal-900">查看机会库 →</Link>
+              </div>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-              <Lightbulb className="h-5 w-5 text-amber-600" />
-              <h2 className="mt-3 text-base font-semibold text-zinc-950">需求挖掘</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">从用户表达里提取机会、风险和行动项。</p>
-            </div>
-            <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-              <Star className="h-5 w-5 text-emerald-600" />
-              <h2 className="mt-3 text-base font-semibold text-zinc-950">口碑信号</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">同时捕捉高分评论里的留存理由。</p>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+                <AlertCircle className="h-5 w-5 text-rose-600" />
+                <h3 className="mt-3 text-base font-semibold text-zinc-950">差评聚类</h3>
+                <p className="mt-2 text-sm leading-6 text-zinc-500">把抱怨压缩成可验证主题，保留原文证据。</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+                <Lightbulb className="h-5 w-5 text-amber-600" />
+                <h3 className="mt-3 text-base font-semibold text-zinc-950">需求挖掘</h3>
+                <p className="mt-2 text-sm leading-6 text-zinc-500">从用户表达里提取机会、风险和行动项。</p>
+              </div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+                <Star className="h-5 w-5 text-emerald-600" />
+                <h3 className="mt-3 text-base font-semibold text-zinc-950">口碑信号</h3>
+                <p className="mt-2 text-sm leading-6 text-zinc-500">同时捕捉高分评论里的留存理由。</p>
+              </div>
             </div>
           </section>
         </>
       )}
       <SiteFooter />
-      <RewardSupportDialog open={rewardOpen} onOpenChange={setRewardOpen} />
     </main>
   );
 }

@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import AppReviewHome from '@/components/app-review/home-client';
 import { getCachedAppSummaries } from '@/lib/appstore/cache';
-import {
-  TOP_CHART_CATEGORIES,
-  TOP_CHART_COUNTRIES,
-  fetchTopChartApps,
-} from '@/lib/appstore/top-charts';
-import { fetchHackerNewsSignals } from '@/lib/signals/hacker-news';
+import { normalizeCountry } from '@/lib/appstore/discovery';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +32,8 @@ export const metadata: Metadata = {
 type PageProps = {
   searchParams?: Promise<{
     cachePage?: string;
+    q?: string;
+    country?: string;
   }>;
 };
 
@@ -50,28 +47,13 @@ export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams;
   const featuredApps = await getCachedAppSummaries();
   const initialCachePage = parseCachePage(params?.cachePage);
-  const initialTopChartApps = await fetchTopChartApps({
-    country: 'cn',
-    chart: 'free',
-    category: 'all',
-    limit: 10,
-  }).catch((error) => {
-    console.error('Failed to load initial top charts:', error);
-    return [];
-  });
-  const initialProductSignals = await fetchHackerNewsSignals().catch((error) => {
-    console.error('Failed to load Hacker News signals:', error);
-    return [];
-  });
 
   return (
     <AppReviewHome
       featuredApps={featuredApps}
       initialCachePage={initialCachePage}
-      topChartCountries={TOP_CHART_COUNTRIES}
-      topChartCategories={TOP_CHART_CATEGORIES}
-      initialTopChartApps={initialTopChartApps}
-      initialProductSignals={initialProductSignals}
+      initialQuery={String(params?.q || '').trim()}
+      initialCountry={normalizeCountry(params?.country)}
     />
   );
 }

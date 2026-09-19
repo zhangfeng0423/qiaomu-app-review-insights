@@ -4,7 +4,13 @@ function requiresAdmin(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method.toUpperCase();
 
-  if (pathname === '/api/sync-all' || pathname.startsWith('/api/migrate-') || pathname === '/api/debug-db') return true;
+  if (
+    pathname === '/api/sync-all'
+    || pathname === '/api/fetch-all'
+    || pathname === '/api/analyze-all'
+    || pathname.startsWith('/api/migrate-')
+    || pathname === '/api/debug-db'
+  ) return true;
   if (pathname.startsWith('/api/test-')) return true;
   if (pathname === '/api/apps' && method !== 'GET') return true;
   if (pathname.startsWith('/api/apps/') && method !== 'GET') {
@@ -21,7 +27,7 @@ function providedAdminToken(request: NextRequest) {
   return request.headers.get('x-admin-token') || '';
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (!requiresAdmin(request)) return NextResponse.next();
 
   const configuredToken = process.env.QIAOMU_ADMIN_TOKEN || '';

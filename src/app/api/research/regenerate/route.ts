@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateCachedReviewPage } from '@/lib/appstore/cache';
 import { normalizeCountry } from '@/lib/appstore/discovery';
-import { appGenerationKey, reservePublicRefresh } from '@/lib/appstore/generation-guard';
+import { appGenerationKey, runGuardedPublicRefresh } from '@/lib/appstore/generation-guard';
 import { ApiResponse } from '@/types';
 
 export const runtime = 'nodejs';
@@ -48,26 +48,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     const allowPublicFullRegenerate = process.env.APP_REVIEW_ALLOW_PUBLIC_FORCE === 'true';
     const incremental = allowPublicFullRegenerate ? body.incremental !== false : true;
     const country = normalizeCountry(body.country);
-    const refreshReservation = await reservePublicRefresh(request, appGenerationKey(country, appId));
+    const generation = await runGuardedPublicRefresh({
+      request,
+      appKey: appGenerationKey(country, appId),
+      generate: () => generateCachedReviewPage({
+        appId,
+        country,
+        maxReviews: clampReviewLimit(body.maxReviews),
+        analyze: body.analyze !== false,
+        force: !incremental,
+        incremental,
+      }),
+    });
 
-    if (!refreshReservation.allowed) {
+    if (generation.status === 'rate-limited') {
       return NextResponse.json(
-        { success: false, error: `这个 App 最近已经更新过，请 ${refreshReservation.retryAfterSeconds} 秒后再试。` },
+        { success: false, error: `这个 App 最近已经更新过，请 ${generation.retryAfterSeconds} 秒后再试。` },
         {
           status: 429,
-          headers: { 'Retry-After': String(refreshReservation.retryAfterSeconds) },
+          headers: { 'Retry-After': String(generation.retryAfterSeconds) },
         }
       );
     }
 
-    const { page, cached } = await generateCachedReviewPage({
-      appId,
-      country,
-      maxReviews: clampReviewLimit(body.maxReviews),
-      analyze: body.analyze !== false,
-      force: !incremental,
-      incremental,
-    });
+    const { page, cached } = generation.result;
 
     return NextResponse.json({
       success: true,

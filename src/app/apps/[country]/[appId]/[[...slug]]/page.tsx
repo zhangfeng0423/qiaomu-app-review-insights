@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { AlertCircle, Apple, ArrowLeft, ArrowUpRight, Lightbulb, Star, Target, TrendingDown } from 'lucide-react';
+import { AlertCircle, Apple, ArrowLeft, ArrowUpRight, Lightbulb, Search, ShieldCheck, Star, Target, TrendingDown } from 'lucide-react';
 import { InsightGrid } from '@/components/app-review/insight-cards';
 import { RegenerateButton } from '@/components/app-review/regenerate-button';
 import { BrandMark, SiteFooter } from '@/components/app-review/site-footer';
@@ -13,7 +13,6 @@ import {
   CachedAppReviewPage,
   buildAppPagePath,
   buildCanonicalUrl,
-  generateCachedReviewPage,
   hasMeaningfulInsights,
   readCachedReviewPage,
 } from '@/lib/appstore/cache';
@@ -61,17 +60,49 @@ function maxRatingBucket(page: CachedAppReviewPage) {
 
 async function getPage(country: string, appId: string) {
   const normalizedCountry = normalizeCountry(country);
-  const cached = await readCachedReviewPage(normalizedCountry, appId);
-  if (cached) return cached;
+  return readCachedReviewPage(normalizedCountry, appId);
+}
 
-  const generated = await generateCachedReviewPage({
-    appId,
-    country: normalizedCountry,
-    maxReviews: 160,
-    analyze: true,
-  });
+function MissingInsightPage({ country, appId }: { country: string; appId: string }) {
+  const normalizedCountry = normalizeCountry(country);
+  const searchHref = `/?q=${encodeURIComponent(appId)}&country=${encodeURIComponent(normalizedCountry)}`;
 
-  return generated.page;
+  return (
+    <main className="min-h-screen bg-[#f7f7f4] text-zinc-950">
+      <header className="border-b border-zinc-200 bg-white/90">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-3">
+            <BrandMark compact />
+          </Link>
+          <Link href="/" className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-950">
+            <ArrowLeft className="h-4 w-4" />
+            返回首页
+          </Link>
+        </div>
+      </header>
+      <section className="mx-auto flex max-w-3xl flex-col items-center px-4 py-20 text-center sm:px-6 sm:py-28">
+        <div className="grid h-14 w-14 place-items-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-700">
+          <Search className="h-6 w-6" />
+        </div>
+        <p className="mt-6 text-sm font-medium text-amber-700">尚未生成 · {normalizedCountry.toUpperCase()} 区 · App {appId}</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">这份 App 洞察还不存在</h1>
+        <p className="mt-4 max-w-xl text-base leading-7 text-zinc-600">
+          查看详情页不会自动抓取评论或调用 AI。请回到首页主动发起研究，系统会先检查缓存与公开额度，再生成可追溯的评论洞察。
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link href={searchHref} className="inline-flex items-center gap-2 rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800">
+            <Search className="h-4 w-4" />
+            去生成这份洞察
+          </Link>
+          <span className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-600">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            GET 无生成副作用
+          </span>
+        </div>
+      </section>
+      <SiteFooter />
+    </main>
+  );
 }
 
 function metadataDescription(page: CachedAppReviewPage) {
@@ -125,6 +156,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function AppInsightPage({ params }: PageProps) {
   const { country, appId } = await params;
   const page = await getPage(country, appId);
+  if (!page) return <MissingInsightPage country={country} appId={appId} />;
   const insights = hasMeaningfulInsights(page.insights) ? page.insights : null;
   const diagnostics = page.diagnostics || buildReviewDiagnostics(page.reviews);
   const historySnapshots = await getReviewHistory(page.app.country, page.app.id);

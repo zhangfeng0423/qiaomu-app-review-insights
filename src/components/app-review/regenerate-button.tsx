@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface RegenerateButtonProps {
   appId: string;
@@ -20,6 +21,7 @@ interface RegenerateResponse {
 }
 
 export function RegenerateButton({ appId, country }: RegenerateButtonProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,7 +41,8 @@ export function RegenerateButton({ appId, country }: RegenerateButtonProps) {
         throw new Error(payload.error || '更新失败');
       }
 
-      window.location.href = `${payload.data.pageUrl}?updated=${Date.now()}`;
+      router.push(`${payload.data.pageUrl}?updated=${Date.now()}`);
+      router.refresh();
     } catch (regenerateError) {
       setError(regenerateError instanceof Error ? regenerateError.message : '更新失败');
     } finally {

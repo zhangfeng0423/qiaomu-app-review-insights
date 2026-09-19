@@ -43,6 +43,14 @@ export interface QueuedGenerationRequest {
   reason: 'rate-limited';
 }
 
+export type GuardedPublicGenerationResult<T> =
+  | { status: 'generated' | 'deduped'; result: T }
+  | { status: 'queued'; limit: GenerationLimitInfo };
+
+export type GuardedPublicRefreshResult<T> =
+  | { status: 'generated' | 'deduped'; result: T }
+  | { status: 'rate-limited'; retryAfterSeconds: number };
+
 const inFlightGenerations = new Map<string, Promise<unknown>>();
 
 function dataRoot() {
@@ -268,5 +276,52 @@ export async function runDedupedGeneration<T>(appKey: string, generate: () => Pr
   return {
     deduped: false,
     result: await promise,
+  };
+}
+
+export async function runGuardedPublicGeneration<T>(options: {
+  request: NextRequest;
+  appKey: string;
+  queue: QueuedGenerationRequest;
+  generate: () => Promise<T>;
+}): Promise<GuardedPublicGenerationResult<T>> {
+  const alreadyInFlight = hasInFlightGeneration(options.appKey);
+
+  if (!alreadyInFlight) {
+    const reservation = await reservePublicGeneration(options.request, options.appKey);
+    if (!reservation.allowed) {
+      const limit = await queuePublicGeneration(options.request, options.queue);
+      return { status: 'queued', limit };
+    }
+  }
+
+  const generation = await runDedupedGeneration(options.appKey, options.generate);
+  return {
+    status: generation.deduped ? 'deduped' : 'generated',
+    result: generation.result,
+  };
+}
+
+export async function runGuardedPublicRefresh<T>(options: {
+  request: NextRequest;
+  appKey: string;
+  generate: () => Promise<T>;
+}): Promise<GuardedPublicRefreshResult<T>> {
+  const alreadyInFlight = hasInFlightGeneration(options.appKey);
+
+  if (!alreadyInFlight) {
+    const reservation = await reservePublicRefresh(options.request, options.appKey);
+    if (!reservation.allowed) {
+      return {
+        status: 'rate-limited',
+        retryAfterSeconds: reservation.retryAfterSeconds,
+      };
+    }
+  }
+
+  const generation = await runDedupedGeneration(options.appKey, options.generate);
+  return {
+    status: generation.deduped ? 'deduped' : 'generated',
+    result: generation.result,
   };
 }

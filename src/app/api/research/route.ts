@@ -11,12 +11,9 @@ import { ReviewDiagnostics } from '@/lib/appstore/diagnostics';
 import {
   GenerationLimitInfo,
   appGenerationKey,
-  hasInFlightGeneration,
   isFreshCachedPage,
   publicCacheFreshDays,
-  queuePublicGeneration,
-  reservePublicGeneration,
-  runDedupedGeneration,
+  runGuardedPublicGeneration,
 } from '@/lib/appstore/generation-guard';
 import { normalizeCountry, AppStoreLookupResult } from '@/lib/appstore/discovery';
 import { ReviewStats } from '@/lib/appstore/review-summary';
@@ -128,59 +125,52 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     }
 
     const appKey = appGenerationKey(resolvedCountry, resolution.app.id);
-    const alreadyInFlight = hasInFlightGeneration(appKey);
+    const generation = await runGuardedPublicGeneration({
+      request,
+      appKey,
+      queue: {
+        appKey,
+        appId: resolution.app.id,
+        appName: resolution.app.name,
+        country: resolvedCountry,
+        query,
+        reason: 'rate-limited',
+      },
+      generate: () => generateCachedReviewPage({
+        query,
+        country: resolvedCountry,
+        maxReviews,
+        analyze: shouldAnalyze,
+        force: force || Boolean(existing && !isFreshCachedPage(existing, freshDays)),
+        resolution,
+      }),
+    });
 
-    if (!alreadyInFlight) {
-      const reservation = await reservePublicGeneration(request, appKey);
+    if (generation.status === 'queued') {
+      const message = existing
+        ? '今天的新 App 生成次数已用完，已记录这个 App。你可以先查看已有洞察页，稍后再回来更新。'
+        : '今天的新 App 生成次数已用完，已记录这个 App，稍后会进入后台生成队列。';
 
-      if (!reservation.allowed) {
-        const limit = await queuePublicGeneration(request, {
-          appKey,
-          appId: resolution.app.id,
-          appName: resolution.app.name,
-          country: resolvedCountry,
-          query,
-          reason: 'rate-limited',
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          data: researchResponse(existing, true, {
+            status: 'queued',
+            message,
+            limit: generation.limit,
+          }),
         });
-        const message = existing
-          ? '今天的新 App 生成次数已用完，已记录这个 App。你可以先查看已有洞察页，稍后再回来更新。'
-          : '今天的新 App 生成次数已用完，已记录这个 App，稍后会进入后台生成队列。';
-
-        if (existing) {
-          return NextResponse.json({
-            success: true,
-            data: researchResponse(existing, true, {
-              status: 'queued',
-              message,
-              limit,
-            }),
-          });
-        }
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: message,
-          },
-          { status: 429 }
-        );
       }
+
+      return NextResponse.json({ success: false, error: message }, { status: 429 });
     }
 
-    const { result, deduped } = await runDedupedGeneration(appKey, () => generateCachedReviewPage({
-      query,
-      country: resolvedCountry,
-      maxReviews,
-      analyze: shouldAnalyze,
-      force: force || Boolean(existing && !isFreshCachedPage(existing, freshDays)),
-      resolution,
-    }));
-    const { page, cached } = result;
+    const { page, cached } = generation.result;
 
     return NextResponse.json({
       success: true,
       data: researchResponse(page, cached, {
-        status: cached ? 'cached' : deduped ? 'deduped' : 'generated',
+        status: cached ? 'cached' : generation.status,
       }),
     });
   } catch (error) {
