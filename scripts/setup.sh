@@ -13,18 +13,18 @@ fi
 NODE_VERSION=$(node -v)
 echo "✅ Node.js 版本: $NODE_VERSION"
 
-# 检查 npm
-if ! command -v npm &> /dev/null; then
-    echo "❌ 错误: npm 未找到"
+# 检查 pnpm
+if ! command -v pnpm &> /dev/null; then
+    echo "❌ 错误: pnpm 未找到，请先安装 pnpm (npm install -g pnpm 或 corepack enable)"
     exit 1
 fi
 
-NPM_VERSION=$(npm -v)
-echo "✅ npm 版本: $NPM_VERSION"
+PNPM_VERSION=$(pnpm -v)
+echo "✅ pnpm 版本: $PNPM_VERSION"
 
 # 安装依赖
 echo "📦 安装项目依赖..."
-npm install
+pnpm install
 
 if [ $? -eq 0 ]; then
     echo "✅ 依赖安装成功"
@@ -70,13 +70,13 @@ echo ""
 echo "🎉 开发环境设置完成！"
 echo ""
 echo "📋 设置清单:"
-echo "  ✅ Node.js 和 npm 检查通过"
+echo "  ✅ Node.js 和 pnpm 检查通过"
 echo "  ✅ 项目依赖安装完成"
 echo "  ✅ 环境变量文件已创建"
 echo "  ✅ 数据目录已创建"
 echo ""
 echo "🚀 启动开发服务器:"
-echo "  npm run dev"
+echo "  pnpm dev"
 echo ""
 echo "🌐 访问地址:"
 echo "  http://localhost:3000"

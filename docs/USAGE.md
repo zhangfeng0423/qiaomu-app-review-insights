@@ -142,7 +142,9 @@
 
 详情页 GET 是只读的：如果对应缓存不存在，页面只会提示“尚未生成”并提供返回首页的预填链接，不会因爬虫、预览或普通访问自动抓取评论和调用模型。
 
-默认情况下，近期缓存会复用，减少重复抓取和 LLM 调用。公开环境还会按客户端限制每天新生成的 App 数量，默认是每天 5 个不同 App。
+默认情况下，近期缓存会复用，减少重复抓取和 LLM 调用。公开环境还会按客户端限制每天新生成的 App 数量，默认是每天 5 个不同 App。服务端会为访客设置一个 HttpOnly 身份 Cookie，减少共享网络下的误伤；清除 Cookie 后仍会回退到 IP 限制。
+
+Docker Compose 默认使用持久化 volume。若部署在 Vercel 等无状态 Serverless 环境，请先执行 `supabase-schema.sql`，并设置 `APP_REVIEW_CACHE_BACKEND=supabase`、`APP_REVIEW_GENERATION_BACKEND=supabase` 以及服务端 Supabase 凭证，让洞察页和限流状态跨实例保存。
 
 ### 兼容的管理和分析页面
 
@@ -160,9 +162,9 @@
 ### 第一步：启动项目
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env.local
-npm run dev
+pnpm dev
 ```
 
 打开：<http://localhost:3000>
@@ -170,8 +172,8 @@ npm run dev
 生产构建完成后，如果使用 `output: standalone`，可以这样启动：
 
 ```bash
-npm run build
-npm run start:standalone
+pnpm build
+pnpm start:standalone
 ```
 
 ### 第二步：配置模型
@@ -355,8 +357,8 @@ curl "http://localhost:3000/api/research/compare?appId=6448311069"
 
 ### 公开环境生成次数用完
 
-默认每天每个客户端最多生成 5 个新 App。已有缓存仍可查看；新的请求会被限流或记录到队列。服务端可以通过 `APP_REVIEW_PUBLIC_DAILY_NEW_APP_LIMIT` 调整上限。
+默认每天每个客户端最多生成 5 个新 App。已有缓存仍可查看；新 App 超出额度时不会假装进入后台生成，而是返回明确的重置时间，并通过 `Retry-After` 告知 API 客户端何时重试。服务端可以通过 `APP_REVIEW_PUBLIC_DAILY_NEW_APP_LIMIT` 调整上限。
 
 ### Docker 启动后缓存不稳定
 
-确认 `APP_REVIEW_CACHE_DIR` 指向容器内可写目录，并为缓存目录配置持久化 volume。Serverless 环境建议使用 Vercel KV、Supabase 或其他持久化存储。
+确认 `APP_REVIEW_CACHE_DIR` 指向容器内可写目录，并为缓存目录配置持久化 volume。Serverless 环境请改用 Supabase：运行 `supabase-schema.sql` 后设置 `APP_REVIEW_CACHE_BACKEND=supabase` 和 `APP_REVIEW_GENERATION_BACKEND=supabase`。

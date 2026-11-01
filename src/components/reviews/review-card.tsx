@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { AppStoreReview, AnalysisResult } from '@/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { 
@@ -20,14 +21,17 @@ interface ReviewCardProps {
 }
 
 export function ReviewCard({ review, analysis, showAnalysis = true, highlight = false }: ReviewCardProps) {
-  // 尝试从 sessionStorage 读取翻译，避免重复请求
-  let translation: { titleZh?: string; contentZh?: string } | null = null;
-  if (typeof window !== 'undefined') {
+  const [translation, setTranslation] = useState<{ titleZh?: string; contentZh?: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     const cached = sessionStorage.getItem(`rev_tr_${review.id}`);
     if (cached) {
-      try { translation = JSON.parse(cached); } catch {}
+      try {
+        setTranslation(JSON.parse(cached));
+      } catch {}
     }
-  }
+  }, [review.id]);
 
   const isNonCN = (review.country || '').toLowerCase() !== 'cn';
   return (
@@ -52,7 +56,7 @@ export function ReviewCard({ review, analysis, showAnalysis = true, highlight = 
             <h3 className="font-semibold text-lg mb-1">
               {review.title}
               {isNonCN && translation?.titleZh && (
-                <div className="text-sm text-gray-600 mt-1">{translation.titleZh}</div>
+                <span className="block text-sm font-normal text-gray-600 mt-1">{translation.titleZh}</span>
               )}
             </h3>
             <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
@@ -61,7 +65,7 @@ export function ReviewCard({ review, analysis, showAnalysis = true, highlight = 
                 {review.authorName}
               </div>
               <span>版本 {review.version}</span>
-              <span>{formatRelativeTime(review.updated)}</span>
+              <span suppressHydrationWarning>{formatRelativeTime(review.updated)}</span>
             </div>
           </div>
           {review.link && (

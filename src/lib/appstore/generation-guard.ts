@@ -4,10 +4,13 @@ import crypto from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { NextRequest } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { CachedAppReviewPage } from '@/lib/appstore/cache';
+import { getServerSupabase, shouldUseSupabaseGenerationGuard } from '@/lib/server/supabase';
 
 const DEFAULT_DAILY_LIMIT = 5;
 const DEFAULT_FRESH_DAYS = 3;
+export const PUBLIC_GENERATION_COOKIE = 'qiaomu_generation_id';
 
 interface DailyClientState {
   generatedAppKeys: string[];
@@ -107,11 +110,27 @@ function clientIp(request: NextRequest) {
 }
 
 export function clientGenerationKey(request: NextRequest) {
+  const cookieValue = request.cookies?.get(PUBLIC_GENERATION_COOKIE)?.value;
   return crypto
     .createHash('sha256')
-    .update(`appreview-public-generation:${clientIp(request)}`)
+    .update(`appreview-public-generation:${cookieValue || clientIp(request)}`)
     .digest('hex')
     .slice(0, 32);
+}
+
+export function setGenerationCookie<T extends NextResponse>(response: T, request: NextRequest): T {
+  if (!request.cookies?.get(PUBLIC_GENERATION_COOKIE)?.value) {
+    response.cookies.set({
+      name: PUBLIC_GENERATION_COOKIE,
+      value: crypto.randomUUID(),
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 180,
+      path: '/',
+    });
+  }
+  return response;
 }
 
 export function appGenerationKey(country: string, appId: string) {
@@ -130,6 +149,24 @@ async function ensureDir(filePath: string) {
 }
 
 async function readDailyState(day = dayKey()): Promise<DailyGenerationState> {
+  if (shouldUseSupabaseGenerationGuard()) {
+    const { data, error } = await getServerSupabase()
+      .from('app_review_generation_states')
+      .select('client_key, generated_app_keys, queued_app_keys, refreshed_app_at')
+      .eq('day', day);
+    if (error) throw error;
+
+    return {
+      day,
+      clients: Object.fromEntries((data || []).map((row) => [row.client_key, {
+        generatedAppKeys: row.generated_app_keys || [],
+        queuedAppKeys: row.queued_app_keys || [],
+        refreshedAppAt: row.refreshed_app_at || {},
+        updatedAt: new Date().toISOString(),
+      }])),
+    };
+  }
+
   try {
     const content = await fs.readFile(stateFilePath(day), 'utf8');
     const parsed = JSON.parse(content) as DailyGenerationState;
@@ -144,6 +181,24 @@ async function readDailyState(day = dayKey()): Promise<DailyGenerationState> {
 }
 
 async function writeDailyState(state: DailyGenerationState) {
+  if (shouldUseSupabaseGenerationGuard()) {
+    const rows = Object.entries(state.clients).map(([clientKey, client]) => ({
+      day: state.day,
+      client_key: clientKey,
+      generated_app_keys: client.generatedAppKeys,
+      queued_app_keys: client.queuedAppKeys,
+      refreshed_app_at: client.refreshedAppAt || {},
+      updated_at: client.updatedAt,
+    }));
+    if (rows.length === 0) return;
+
+    const { error } = await getServerSupabase()
+      .from('app_review_generation_states')
+      .upsert(rows, { onConflict: 'day,client_key' });
+    if (error) throw error;
+    return;
+  }
+
   const filePath = stateFilePath(state.day);
   await ensureDir(filePath);
   const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
@@ -220,6 +275,23 @@ export async function queuePublicGeneration(
   await writeDailyState(state);
 
   const queuePath = queueFilePath(day);
+  if (shouldUseSupabaseGenerationGuard()) {
+    const { error } = await getServerSupabase()
+      .from('app_review_generation_queue')
+      .upsert({
+        day,
+        client_key: clientKey,
+        app_key: requestInfo.appKey,
+        app_id: requestInfo.appId,
+        app_name: requestInfo.appName || null,
+        country: requestInfo.country,
+        query: requestInfo.query || null,
+        reason: requestInfo.reason,
+      }, { onConflict: 'day,client_key,app_key' });
+    if (error) throw error;
+    return limitInfo(client, dailyLimit(), day);
+  }
+
   await ensureDir(queuePath);
   await fs.appendFile(queuePath, `${JSON.stringify({
     ...requestInfo,

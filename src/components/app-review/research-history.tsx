@@ -92,7 +92,7 @@ export function ResearchHistoryPanel({
                   const dominantTheme = [...snapshot.issueThemes].sort((left, right) => right.count - left.count)[0];
                   return (
                     <tr key={`${snapshot.capturedAt}-${index}`} className={index === 0 ? 'bg-teal-50/40' : 'bg-white'}>
-                      <td className="whitespace-nowrap px-4 py-3 text-zinc-600">{formatDate(snapshot.capturedAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-zinc-600" suppressHydrationWarning>{formatDate(snapshot.capturedAt)}</td>
                       <td className="px-4 py-3 text-zinc-700">{snapshot.totalReviews}</td>
                       <td className="px-4 py-3 font-medium text-zinc-900">{snapshot.averageRating} <span className="text-xs font-normal text-zinc-400">/ 5</span></td>
                       <td className="px-4 py-3 text-rose-600">{percent(snapshot.negativeShare)}</td>

@@ -36,9 +36,9 @@ export default function ProductSignals({ signals }: { signals: ProductSignal[] }
           </a>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {signals.slice(0, 9).map((signal) => (
-            <a key={signal.id} href={signal.url} target="_blank" rel="noreferrer" className="group rounded-lg border border-zinc-100 bg-zinc-50 p-4 transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-teal-50/30">
+            <a key={signal.id} href={signal.url} target="_blank" rel="noreferrer" className="group min-w-0 rounded-lg border border-zinc-100 bg-zinc-50 p-4 transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-teal-50/30">
               <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-500">
                 <span className="inline-flex items-center gap-1 text-teal-700"><Sparkles className="h-3.5 w-3.5" />{kindLabel(signal.kind)}</span>
                 <span>{formatDate(signal.publishedAt)}</span>
@@ -57,4 +57,3 @@ export default function ProductSignals({ signals }: { signals: ProductSignal[] }
     </section>
   );
 }
-

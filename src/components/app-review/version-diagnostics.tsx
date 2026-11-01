@@ -56,20 +56,27 @@ function EChartView({
   const chartRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!chartRef.current) return;
+    const element = chartRef.current;
+    if (!element) return;
 
-    const chart = echarts.init(chartRef.current, undefined, { renderer: 'canvas' });
-    chart.setOption(option, true);
+    let chart: ReturnType<typeof echarts.init> | null = null;
+    const render = () => {
+      if (!element.clientWidth || !element.clientHeight) return;
+      chart ??= echarts.init(element, undefined, { renderer: 'canvas' });
+      chart.setOption(option, true);
+      chart.resize();
+    };
 
-    const resize = () => chart.resize();
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
-    observer?.observe(chartRef.current);
+    render();
+    const resize = render;
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(render) : null;
+    observer?.observe(element);
     window.addEventListener('resize', resize);
 
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', resize);
-      chart.dispose();
+      chart?.dispose();
     };
   }, [option]);
 

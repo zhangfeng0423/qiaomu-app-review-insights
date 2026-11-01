@@ -101,50 +101,52 @@ export function InsightCard({
   const style = insightStyles[kind];
 
   return (
-    <section className={`relative overflow-hidden rounded-lg border p-4 shadow-sm ${style.card}`}>
+    <section className={`relative overflow-hidden rounded-xl border p-5 shadow-sm transition hover:shadow-md ${style.card}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${style.iconBox}`}>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${style.iconBox}`}>
             {style.icon}
           </span>
           <div className="min-w-0">
             <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${style.eyebrow}`}>
               {style.label}
             </p>
-            <h2 className="mt-1 text-base font-semibold text-zinc-950">{title}</h2>
+            <h2 className="mt-0.5 text-lg font-bold text-zinc-950">{title}</h2>
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-white/80 bg-white/80 px-2.5 py-1 text-xs text-zinc-500">
-          {items.length || 0} 条
+        <span className="shrink-0 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-xs font-medium text-zinc-600 shadow-sm">
+          {items.length || 0} 个信号
         </span>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-3.5">
         {items.length === 0 ? (
-          <p className="rounded-md border border-white/80 bg-white/70 px-3 py-2 text-sm text-zinc-500">
+          <p className="rounded-lg border border-white/80 bg-white/70 px-4 py-3 text-sm text-zinc-500">
             暂无明显信号。
           </p>
         ) : items.map((item, index) => {
           const priority = item.priority || 'medium';
 
           return (
-            <article key={`${item.title}-${index}`} className="rounded-md border border-white/80 bg-white/90 p-3">
+            <article key={`${item.title}-${index}`} className="rounded-xl border border-white/90 bg-white/95 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition hover:border-zinc-300/80">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${style.marker}`} />
-                    <h3 className="break-words text-sm font-semibold leading-6 text-zinc-950">{item.title}</h3>
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.marker}`} />
+                    <h3 className="break-words text-sm font-bold leading-6 text-zinc-950">{item.title}</h3>
                   </div>
                   <p className="mt-1 text-sm leading-6 text-zinc-700">{item.summary}</p>
                 </div>
-                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${priorityStyle[priority]}`}>
+                <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${priorityStyle[priority]}`}>
                   {priorityLabel[priority]}
                 </span>
               </div>
               {item.evidence ? (
-                <p className="mt-2 border-l-2 border-zinc-200 pl-3 text-xs leading-5 text-zinc-500">
-                  {item.evidence}
-                </p>
+                <div className="mt-3 rounded-lg border border-zinc-100 bg-zinc-50/80 px-3 py-2 text-xs leading-relaxed text-zinc-600">
+                  <span className="font-serif text-sm font-bold text-zinc-400 mr-1">“</span>
+                  <span className="italic">{item.evidence}</span>
+                  <span className="font-serif text-sm font-bold text-zinc-400 ml-1">”</span>
+                </div>
               ) : null}
             </article>
           );

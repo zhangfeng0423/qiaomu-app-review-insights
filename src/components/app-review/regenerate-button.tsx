@@ -3,21 +3,11 @@
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { requestResearch } from '@/lib/research-request';
 
 interface RegenerateButtonProps {
   appId: string;
   country: string;
-}
-
-interface RegenerateResponse {
-  success: boolean;
-  data?: {
-    pageUrl: string;
-    updatedAt: string;
-    cached: boolean;
-    incremental: boolean;
-  };
-  error?: string;
 }
 
 export function RegenerateButton({ appId, country }: RegenerateButtonProps) {
@@ -30,18 +20,10 @@ export function RegenerateButton({ appId, country }: RegenerateButtonProps) {
     setError('');
 
     try {
-      const response = await fetch('/api/research/regenerate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appId, country, maxReviews: 400, analyze: true, incremental: true }),
+      const result = await requestResearch<{pageUrl:string}>('/api/research/regenerate', {
+        appId, country, maxReviews:400, analyze:true, incremental:true,
       });
-      const payload = await response.json() as RegenerateResponse;
-
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.error || '更新失败');
-      }
-
-      router.push(`${payload.data.pageUrl}?updated=${Date.now()}`);
+      router.push(`${result.pageUrl}?updated=${Date.now()}`);
       router.refresh();
     } catch (regenerateError) {
       setError(regenerateError instanceof Error ? regenerateError.message : '更新失败');

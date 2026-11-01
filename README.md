@@ -14,6 +14,8 @@
 
 详细使用说明：[docs/USAGE.md](docs/USAGE.md)
 
+个人 fork 的公开试用交付、数据库迁移、任务恢复与回滚：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+
 ## 为什么值得用
 
 App Store 评论里藏着真实需求、付费阻力、版本事故和竞品机会，但它们通常散在几百条高噪声评论里。乔木 App 洞察会自动抓取评论，用分析模型提炼结构化洞察，并生成可缓存、可分享、可复盘的 App 评价洞察页面。
@@ -66,9 +68,9 @@ App Store 评论里藏着真实需求、付费阻力、版本事故和竞品机�
 ```bash
 git clone https://github.com/joeseesun/qiaomu-app-review-insights.git
 cd qiaomu-app-review-insights
-npm install
+pnpm install
 cp .env.example .env.local
-npm run dev
+pnpm dev
 ```
 
 打开 [http://localhost:3000](http://localhost:3000)。
@@ -81,6 +83,8 @@ QIAOMU_LLM_BASE_URL=https://api.deepseek.com/v1
 QIAOMU_LLM_MODEL=deepseek-v4-flash
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 STORAGE_TYPE=local
+APP_REVIEW_CACHE_BACKEND=local
+APP_REVIEW_GENERATION_BACKEND=local
 ```
 
 不要把 `.env.local`、`.env.development` 或真实 API Key 提交到仓库。
@@ -116,7 +120,7 @@ node scripts/precache-top-apps.mjs \
 
 ```bash
 cp .env.example .env.production
-npm run build
+pnpm build
 docker compose --env-file .env.production up -d --build
 curl http://127.0.0.1:3095/api/health
 ```
@@ -127,6 +131,17 @@ curl http://127.0.0.1:3095/api/health
 NEXT_PUBLIC_SITE_URL=https://your-domain.example
 APP_REVIEW_CACHE_DIR=/app/src/data/app-cache
 ```
+
+Docker Compose 已经把 `/app/src/data` 挂载到持久化 volume。若部署在 Vercel 或其他无状态 Serverless 环境，请先执行 `supabase-schema.sql`，再设置：
+
+```env
+APP_REVIEW_CACHE_BACKEND=supabase
+APP_REVIEW_GENERATION_BACKEND=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_server_only_key
+```
+
+这样洞察页缓存、公开生成额度和刷新限制都会跨实例保留。`SUPABASE_SERVICE_ROLE_KEY` 只能放在服务端环境变量中，不能写入 `NEXT_PUBLIC_*`。
 
 默认 Docker 端口是 `3095`。挂到 Nginx、Caddy 或 Cloudflare Tunnel 时，把外部域名代理到该端口即可。
 
@@ -185,7 +200,7 @@ Skill 会引导 Agent 使用公开站点、API、缓存页面和产品洞察分�
 - App Store RSS 评论接口有分页和地区差异，结果取决于国家区、抓取时间和 Apple 返回内容。
 - AI 洞察不是事实裁决，页面会保留原始评论证据，建议结合证据判断。
 - 公开生成会限流并复用缓存，避免无成本批量消耗 LLM token。
-- Serverless 平台需要额外配置持久化存储，否则缓存和历史评论不会稳定保留。
+- Serverless 平台需要配置 `APP_REVIEW_CACHE_BACKEND=supabase` 和 `APP_REVIEW_GENERATION_BACKEND=supabase`，否则缓存与公开限流状态只保留在当前实例。
 
 ## Troubleshooting
 
@@ -237,9 +252,9 @@ App Store reviews contain product truth: why users churn, why they pay, which up
 ```bash
 git clone https://github.com/joeseesun/qiaomu-app-review-insights.git
 cd qiaomu-app-review-insights
-npm install
+pnpm install
 cp .env.example .env.local
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).

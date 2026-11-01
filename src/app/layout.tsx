@@ -4,9 +4,10 @@ import "./globals.css";
 
 const umamiWebsiteId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
 const umamiDomain = process.env.NEXT_PUBLIC_UMAMI_DOMAIN || "appreview.qiaomu.ai";
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://appreview.qiaomu.ai').replace(/\/$/,'');
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://appreview.qiaomu.ai"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "乔木 App 洞察",
     template: "%s | 乔木 App 洞察",
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "乔木 App 洞察",
     description: "把 App Store 用户评价变成清晰、可复盘的产品洞察页面。",
-    url: "https://appreview.qiaomu.ai/",
+    url: `${siteUrl}/`,
     siteName: "乔木 App 洞察",
     type: "website",
   },
@@ -37,9 +38,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body
         className="antialiased"
+        suppressHydrationWarning
       >
         {children}
         {umamiWebsiteId ? (
