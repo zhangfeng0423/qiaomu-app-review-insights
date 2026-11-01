@@ -22,7 +22,7 @@ QIAOMU_LLM_API_KEY=
 QIAOMU_LLM_BASE_URL=
 QIAOMU_LLM_MODEL=
 QIAOMU_ADMIN_TOKEN=
-NEXT_PUBLIC_SITE_URL=https://qiaomu-app-review-insights.vercel.app
+NEXT_PUBLIC_SITE_URL=https://qiaomu-app-review-insights-delta.vercel.app
 APP_REVIEW_PUBLIC_DAILY_NEW_APP_LIMIT=5
 ```
 

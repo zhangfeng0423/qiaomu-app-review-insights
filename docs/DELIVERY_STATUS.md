@@ -70,6 +70,15 @@ Latest runtime evidence:
   the personal fork. Node 22, pnpm frozen install, production-only server secrets
   configured. Existing unrelated projects were not altered. No deployment yet.
 - Current unit tests: 15 passed (including strict URL/region input tests).
+- Delivery commit `bc70836` pushed; personal fork PR #1 created as draft.
+- GitHub CI run 41263007671 passed every check on Node 22 from a clean checkout.
+- Restart durability verified: a new app process returned the same completed
+  Duolingo task, 160 reviews, and AI summary from Supabase; health remained connected.
+- Initial Vercel deployment failed at adapter packaging: Next 16.3 standalone
+  ENOENT for next-server.js.nft.json (upstream issue vercel/next.js#96646).
+  Vercel now uses adapter output; Docker keeps standalone.
+- Verified primary project domain: qiaomu-app-review-insights-delta.vercel.app.
+  Production canonical URL configuration corrected to this assigned domain.
 
 - [ ] Verify/apply repeatable migrations and RLS; real server read/write and anonymous isolation.
 - [ ] Import existing reports and histories, verify contents, enable persistence.
