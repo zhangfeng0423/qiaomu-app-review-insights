@@ -16,6 +16,8 @@
 
 个人 fork 的公开试用交付、数据库迁移、任务恢复与回滚：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
+本 fork 试用地址：[qiaomu-app-review-insights-delta.vercel.app](https://qiaomu-app-review-insights-delta.vercel.app)。个人仓库：[zhangfeng0423/qiaomu-app-review-insights](https://github.com/zhangfeng0423/qiaomu-app-review-insights)。原作者与原项目链接保留于下方。
+
 ## 为什么值得用
 
 App Store 评论里藏着真实需求、付费阻力、版本事故和竞品机会，但它们通常散在几百条高噪声评论里。乔木 App 洞察会自动抓取评论，用分析模型提炼结构化洞察，并生成可缓存、可分享、可复盘的 App 评价洞察页面。

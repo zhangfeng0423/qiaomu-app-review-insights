@@ -10,8 +10,8 @@ Updated: 2026-11-01 (Asia/Shanghai). Target: the personal fork only.
 - Public URL: https://qiaomu-app-review-insights-delta.vercel.app
 - Vercel project: `prj_5jAnOgaLgOv0X9DDQB1IINvfDbCf`
 - Supabase project: `aycdtkpiuptagwhcvwrt` (Seoul)
-- Verified production deployment: `dpl_7Nh97w9FBp9z1CNEC1CbVEjt7c42`, commit `ee997de`.
-- Final homepage canonical correction and additional failure tests await final deployment/CI verification.
+- Verified production deployment: `dpl_CyWEkgTZBRN61QQaffPVzR6E9dcT`, runtime commit `9b1ed1a`.
+- Release audit below is documentation-only relative to the tested runtime commit.
 
 ## Requirement audit
 
@@ -34,7 +34,8 @@ Updated: 2026-11-01 (Asia/Shanghai). Target: the personal fork only.
 - [x] Health probes actual table/RPC connectivity and returns 503 on dependency failure.
 - [x] CI, pinned pnpm lock/install, repeatable migration/import commands and deployment/rollback handbook included.
 - [x] Changes pushed and personal-fork PR created; upstream repository and unrelated projects unchanged.
-- [ ] Final revision CI and production deployment verified; PR marked ready and release coordinates finalized.
+- [x] Final runtime revision CI and production deployment verified; release coordinates finalized.
+- PR readiness is finalized after this documentation update; no automatic merge.
 
 ## Verification evidence
 
@@ -50,6 +51,15 @@ Updated: 2026-11-01 (Asia/Shanghai). Target: the personal fork only.
 - 1440px report: scrollWidth=1440; evidence heading visible; Home key selected first report tab.
 - Live health: ok=true, database=connected, cacheBackend=supabase, generationBackend=supabase, durable=true.
 - Dedicated real-DB verifier: `node scripts/verify-durable-jobs.mjs` passed without model calls and cleaned only its own synthetic fixtures.
+- Final runtime CI runs 41264889580 and 41264885253 both passed on commit 9b1ed1a.
+- Final public homepage canonical and og:url match the assigned primary domain
+  (Next.js normalizes away the trailing slash).
+- Final public health returned 200, connected/durable true; Signal refresh returned
+  429 and Retry-After=630 while inside its App cooldown.
+- Final online browser: Signal reviews rendered at 390px without overflow or
+  warn/error logs; Duolingo evidence tab displayed the original review headings.
+- Previous known-good deployment for traffic rollback:
+  `dpl_7Nh97w9FBp9z1CNEC1CbVEjt7c42` (runtime commit ee997de).
 
 ## Operating limits and handoff
 
