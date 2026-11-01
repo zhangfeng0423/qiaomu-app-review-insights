@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { listCachedReviewPages } from '@/lib/appstore/cache';
 
-const siteUrl = 'https://appreview.qiaomu.ai';
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://appreview.qiaomu.ai').replace(/\/$/,'');
 
 export const dynamic = 'force-dynamic';
 

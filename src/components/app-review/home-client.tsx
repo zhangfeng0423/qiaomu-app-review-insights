@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { PENDING_RESEARCH_KEY, requestResearch, resumeResearchJob } from '@/lib/research-request';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -10,14 +11,14 @@ import {
   CheckCircle2,
   ChevronsUpDown,
   Compass,
-  Lightbulb,
   Loader2,
   Search,
+  Sparkles,
   Star,
   X,
 } from 'lucide-react';
 import { InsightGrid } from '@/components/app-review/insight-cards';
-import { BrandMark, SiteAffordances, SiteFooter } from '@/components/app-review/site-footer';
+import { BrandMark, SiteAffordances } from '@/components/app-review/site-footer';
 import {
   ReviewSourceBreakdown,
   ReviewSourceBreakdownPanel,
@@ -115,12 +116,6 @@ interface FeaturedAppSummary {
   negativeShare: number;
   positiveShare: number;
   primaryGenreName?: string;
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
 }
 
 const countryOptions = [
@@ -223,51 +218,75 @@ function FeaturedApps({ apps, currentPage }: { apps: FeaturedAppSummary[]; curre
     .filter((item) => item === 1 || item === totalPages || Math.abs(item - page) <= 1);
 
   return (
-    <section id="cached-apps" className="mx-auto max-w-7xl scroll-mt-6 px-4 pt-6 sm:px-6 lg:px-8">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+    <section id="cached-apps" className="mx-auto max-w-7xl scroll-mt-6 px-4 pt-10 pb-16 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-950">已生成的 App 洞察页</h2>
-          <p className="mt-1 text-sm text-zinc-500">所有查询过的 App 都会出现在这里，按最近更新时间分页展示。</p>
+          <h2 className="text-xl font-bold text-zinc-950">已收录的 App 洞察研判</h2>
+        <p className="mt-1 text-sm text-zinc-600">点击任意 App 卡片即可直达深度分析报告，支持多版本走势与差评证据核对。</p>
         </div>
-        <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-500">
-          共 {apps.length} 个 · 第 {page}/{totalPages} 页
+        <span className="rounded-full border border-zinc-200 bg-white px-3.5 py-1 text-xs font-semibold text-zinc-600 shadow-xs">
+          共 {apps.length} 个应用 · 第 {page}/{totalPages} 页
         </span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {pageApps.map((app) => (
           <Link
             key={`${app.country}-${app.id}`}
             href={app.pagePath}
-            className="group flex min-w-0 gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
+            className="group relative flex min-w-0 flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-teal-500/50 hover:shadow-md"
           >
-            {app.artworkUrl ? (
-              <Image
-                src={app.artworkUrl}
-                alt={`${app.name} icon`}
-                width={48}
-                height={48}
-                unoptimized
-                className="h-12 w-12 shrink-0 rounded-lg border border-zinc-200 bg-white object-cover"
-              />
-            ) : (
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-zinc-950 text-white">
-                <Apple className="h-6 w-6" />
+            <div>
+              <div className="flex items-start gap-3.5">
+                {app.artworkUrl ? (
+                  <Image
+                    src={app.artworkUrl}
+                    alt={`${app.name} icon`}
+                    width={56}
+                    height={56}
+                    unoptimized
+                    className="h-14 w-14 shrink-0 rounded-xl border border-zinc-100 bg-white object-cover shadow-xs"
+                  />
+                ) : (
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-zinc-950 text-white">
+                    <Apple className="h-7 w-7" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <h3 className="truncate text-base font-bold text-zinc-950 group-hover:text-teal-700 transition">
+                      {app.name}
+                    </h3>
+                    <span className="shrink-0 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-bold text-zinc-600">
+                      {app.country.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-zinc-500">
+                    {app.artistName || app.primaryGenreName || 'App Store'}
+                  </p>
+                </div>
               </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="truncate text-sm font-semibold text-zinc-950 group-hover:text-teal-700">{app.name}</h3>
-                <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] text-zinc-500">
-                  {app.country.toUpperCase()}
-                </span>
+
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="rounded-xl border border-zinc-100 bg-zinc-50/70 p-2">
+                  <span className="text-zinc-500 block text-[10px]">评分</span>
+                  <span className="font-bold text-zinc-900 mt-0.5 block">★ {app.averageRating || 0}</span>
+                </div>
+                <div className="rounded-xl border border-zinc-100 bg-zinc-50/70 p-2">
+                  <span className="text-zinc-500 block text-[10px]">样本</span>
+                  <span className="font-bold text-zinc-900 mt-0.5 block">{app.totalReviews} 条</span>
+                </div>
+                <div className="rounded-xl border border-rose-100/70 bg-rose-50/50 p-2">
+                  <span className="text-rose-700 block text-[10px]">差评率</span>
+                  <span className="font-bold text-rose-700 mt-0.5 block">{formatPercent(app.negativeShare)}</span>
+                </div>
               </div>
-              <p className="mt-1 truncate text-xs text-zinc-500">{app.artistName || app.primaryGenreName || 'App Store'}</p>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">{app.averageRating || 0} 星</span>
-                <span className="rounded-md bg-zinc-50 px-2 py-1 text-zinc-600">{app.totalReviews} 条</span>
-                <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-700">{formatPercent(app.negativeShare)}</span>
-              </div>
-              <p className="mt-2 text-[11px] text-zinc-400">更新 {formatDate(app.updatedAt)}</p>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3 text-[11px] text-zinc-500">
+              <span suppressHydrationWarning>更新于 {formatDate(app.updatedAt)}</span>
+              <span className="font-semibold text-teal-700 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                查看洞察 →
+              </span>
             </div>
           </Link>
         ))}
@@ -332,40 +351,66 @@ export default function Home({
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [country, setCountry] = useState(initialCountry);
-  const [maxReviews, setMaxReviews] = useState(160);
-  const analyze = true;
+  const maxReviews = 160;
   const [loading, setLoading] = useState(false);
+  const [analyzingAI, setAnalyzingAI] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<ResearchData | null>(null);
+
+  useEffect(() => {
+    let id: string | null = null;
+    try { id = localStorage.getItem(PENDING_RESEARCH_KEY); } catch { return; }
+    if (!id) return;
+    const controller = new AbortController();
+    // Storage is an external system; recovery starts after mount without
+    // changing state during the synchronous effect setup.
+    queueMicrotask(() => { if (!controller.signal.aborted) setLoading(true); });
+    resumeResearchJob<ResearchData>(id,controller.signal).then(setResult).catch((error: unknown) => {
+      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : '进度恢复失败');
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, []);
 
   const maxBucket = useMemo(() => result ? maxRatingBucket(result.stats) : 1, [result]);
   const visibleInsights = result?.insights && hasMeaningfulClientInsights(result.insights) ? result.insights : null;
 
-  const runResearch = async (event?: FormEvent<HTMLFormElement>) => {
-    event?.preventDefault();
-    if (!query.trim()) return;
+  const executeResearch = async (targetQuery: string, targetCountry: string) => {
+    if (!targetQuery.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/research', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, country, maxReviews, analyze }),
-      });
-      const payload = await response.json() as ApiResponse<ResearchData>;
-
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.error || '检索失败');
-      }
-
-      setResult(payload.data);
+      setResult(await requestResearch<ResearchData>('/api/research', {
+        query: targetQuery, country: targetCountry, maxReviews, analyze: false,
+      }));
     } catch (researchError) {
       setError(researchError instanceof Error ? researchError.message : '检索失败');
     } finally {
       setLoading(false);
     }
+  };
+
+  const triggerAIAnalysis = async () => {
+    if (!result || analyzingAI) return;
+
+    setAnalyzingAI(true);
+    setError('');
+
+    try {
+      setResult(await requestResearch<ResearchData>('/api/research', {
+        query: result.app.id, country: result.app.country, maxReviews, analyze: true,
+      }));
+    } catch (aiError) {
+      setError(aiError instanceof Error ? aiError.message : 'AI 研判生成失败');
+    } finally {
+      setAnalyzingAI(false);
+    }
+  };
+
+  const runResearch = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    await executeResearch(query, country);
   };
 
   return (
@@ -383,101 +428,135 @@ export default function Home({
         </div>
       </header>
 
-      <section className="border-b border-zinc-200 bg-[#fdfdfb]">
-        <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-teal-700">App Store 评论研究</p>
-            <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
-              从一个竞品 App，找到有证据的产品机会
-            </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-600">
-              输入 App Store 链接或 ID，系统会抓取近期评论，提炼核心痛点、产品机会和版本风险，并保留每条结论对应的评论证据。
-            </p>
-            <ol className="mt-5 grid gap-2 text-sm text-zinc-600 sm:grid-cols-3">
-              {['输入 App', '生成结构化洞察', '核对原文证据'].map((step, index) => (
-                <li key={step} className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2">
-                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-zinc-950 text-[11px] font-semibold text-white">{index + 1}</span>
-                  {step}
-                </li>
-              ))}
-            </ol>
-            <form onSubmit={runResearch} className="mt-6 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_130px_118px_44px]">
-                <div className="relative min-w-0">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="App Store 链接、App ID 或应用名称"
-                    className="h-11 rounded-md border-zinc-200 bg-zinc-50 pl-9 pr-10 text-base focus-visible:ring-zinc-900"
-                  />
-                  {query ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuery('');
-                        setError('');
-                      }}
-                      aria-label="清除搜索内容"
-                      className="absolute right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900/15"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                </div>
-                <div className="relative">
-                  <select
-                    value={country}
-                    onChange={(event) => setCountry(event.target.value)}
-                    className="h-11 w-full appearance-none rounded-md border border-zinc-200 bg-zinc-50 px-3 pr-8 text-sm text-zinc-900 outline-none transition focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10"
-                    aria-label="App Store country"
-                  >
-                    {countryOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                </div>
-                <div className="relative">
-                  <select
-                    value={maxReviews}
-                    onChange={(event) => setMaxReviews(Number(event.target.value))}
-                    className="h-11 w-full appearance-none rounded-md border border-zinc-200 bg-zinc-50 px-3 pr-8 text-sm text-zinc-900 outline-none transition focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10"
-                    aria-label="Review limit"
-                  >
-                    <option value={80}>80 条</option>
-                    <option value={160}>160 条</option>
-                    <option value={260}>260 条</option>
-                    <option value={400}>400 条</option>
-                  </select>
-                  <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                </div>
-                <Button type="submit" size="icon" disabled={loading || !query.trim()} className="h-11 w-full rounded-md bg-zinc-950 hover:bg-zinc-800 lg:w-11">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                </Button>
-              </div>
-            </form>
-            {error ? (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            ) : null}
-            {loading ? (
-              <div className="mt-3 flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800" role="status" aria-live="polite">
-                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
-                <div>
-                  <p className="font-medium">正在准备洞察报告</p>
-                  <p className="mt-1 text-sky-700">检查缓存与公开额度，然后抓取评论、整理证据并生成结构化结论。请不要重复提交。</p>
-                </div>
-              </div>
-            ) : null}
+      <section className="border-b border-zinc-200 bg-gradient-to-b from-white via-[#fdfdfb] to-[#f7f7f4]/40 py-10 sm:py-14">
+        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50/80 px-3.5 py-1 text-xs font-medium text-teal-800 backdrop-blur">
+            <Sparkles className="h-3.5 w-3.5 text-teal-600" />
+            <span>AI 驱动的 App 评论与口碑研判</span>
           </div>
+
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-zinc-950 sm:text-5xl sm:leading-tight">
+            从真实用户评价中，<br className="hidden sm:inline" />发现关键痛点与产品机会
+          </h1>
+
+          <p className="mx-auto mt-4 max-w-2xl text-base text-zinc-600 sm:text-lg">
+            输入任意 iOS 应用名称或 App Store 链接，先查看真实评论样本，再按需生成可溯源的 AI 研判，提炼产品痛点、版本问题与改进建议。
+          </p>
+
+          <form onSubmit={runResearch} className="mt-8 rounded-2xl border border-zinc-200/90 bg-white p-2 shadow-lg shadow-zinc-200/50 transition focus-within:border-zinc-400 focus-within:ring-4 focus-within:ring-zinc-900/5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1 min-w-0">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
+                <Input
+                  aria-label="App 名称、App Store 链接或 App ID"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="输入 App 名称、App Store 链接或 App ID..."
+                  className="h-12 border-0 bg-transparent pl-11 pr-10 text-base text-zinc-900 placeholder:text-zinc-400 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      setError('');
+                    }}
+                    aria-label="清除搜索内容"
+                    className="absolute right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="relative flex items-center border-t border-zinc-100 sm:border-t-0 sm:border-l sm:border-zinc-200 sm:pl-3">
+                <select
+                  value={country}
+                  onChange={(event) => setCountry(event.target.value)}
+                  className="h-11 appearance-none bg-transparent pl-2 pr-7 text-sm font-medium text-zinc-700 outline-none cursor-pointer hover:text-zinc-950"
+                  aria-label="选择 App Store 地区"
+                >
+                  {countryOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <ChevronsUpDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading || !query.trim()}
+                className="h-11 rounded-xl bg-zinc-950 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Search className="h-4 w-4 mr-1.5" />}
+                开始搜索
+              </Button>
+            </div>
+          </form>
+
+          {/* Quick research sample chips */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-500">
+            <span className="font-medium text-zinc-500">快速体验:</span>
+            {[
+              { label: 'ChatGPT', query: 'ChatGPT', country: 'us', flag: '🇺🇸' },
+              { label: 'Notion', query: 'Notion', country: 'us', flag: '🇺🇸' },
+              { label: 'Duolingo', query: 'Duolingo', country: 'us', flag: '🇺🇸' },
+              { label: '微信', query: '微信', country: 'cn', flag: '🇨🇳' },
+              { label: '小红书', query: '小红书', country: 'cn', flag: '🇨🇳' },
+            ].map((sample) => (
+              <button
+                key={sample.label}
+                type="button"
+                onClick={() => {
+                  setQuery(sample.query);
+                  setCountry(sample.country);
+                  executeResearch(sample.query, sample.country);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200/80 bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-xs transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950"
+              >
+                <span>{sample.flag}</span>
+                <span>{sample.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {error ? (
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-left text-sm text-rose-700 shadow-xs">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/90 p-4 text-left text-sm text-sky-800 shadow-xs" role="status" aria-live="polite">
+              <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-sky-600" />
+              <div>
+                <p className="font-semibold text-sky-950">正在获取应用信息与评论数据...</p>
+                <p className="mt-1 text-xs text-sky-700 leading-relaxed">正在准备报告，可能需要几分钟。刷新或稍后返回首页可恢复已登记任务的进度。</p>
+              </div>
+            </div>
+          ) : null}
+
+
         </div>
       </section>
 
       {result ? (
         <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          {result.source === 'search' && result.candidates.length > 1 ? (
+            <section className="mb-4 rounded-lg border border-zinc-200 bg-white p-4" aria-label="匹配的应用">
+              <p className="text-sm font-medium text-zinc-800">不是你要找的应用？选择其他匹配结果：</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {result.candidates.map(candidate => (
+                  <button key={candidate.id} type="button" disabled={loading || analyzingAI || candidate.id === result.app.id}
+                    onClick={() => { setQuery(candidate.id); setCountry(candidate.country); void executeResearch(candidate.id,candidate.country); }}
+                    className="max-w-full break-words rounded-md border border-zinc-200 px-3 py-2 text-left text-sm text-zinc-700 hover:border-teal-500 disabled:opacity-50">
+                    {candidate.name} · {candidate.artistName}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <section className="min-w-0 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -519,13 +598,32 @@ export default function Home({
                   </div>
                 ) : null}
               </div>
-              <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${visibleInsights ? 'border-teal-100 bg-teal-50 text-teal-800' : result.aiError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-sky-200 bg-sky-50 text-sky-800'}`}>
-                {visibleInsights ? '洞察报告已就绪' : result.aiError ? '评论已抓取，AI 洞察未完成' : '评论数据已准备'}：<Link href={result.pageUrl} className="font-semibold underline underline-offset-4">查看稳定报告页</Link>
-                <span className="ml-2 text-teal-700">更新于 {formatFullDate(result.updatedAt)}</span>
+              <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${visibleInsights ? 'border-teal-100 bg-teal-50 text-teal-800' : result.aiError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-sky-200 bg-sky-50 text-sky-800'}`}>
+                <div>
+                  {visibleInsights ? '洞察报告已就绪' : result.aiError ? '评论已抓取，AI 洞察未完成' : '评论数据已准备'}：<Link href={result.pageUrl} className="font-semibold underline underline-offset-4">查看稳定报告页</Link>
+                  <span className="ml-2 text-teal-700">更新于 {formatFullDate(result.updatedAt)}</span>
+                </div>
+                {!visibleInsights && result.stats.totalReviews > 0 ? (
+                  <button
+                    type="button"
+                    onClick={triggerAIAnalysis}
+                    disabled={analyzingAI}
+                    aria-busy={analyzingAI}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {analyzingAI ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {analyzingAI ? '正在生成…' : result.aiError ? '重试 AI 研判' : '生成 AI 研判'}
+                  </button>
+                ) : null}
               </div>
               {result.generation?.message ? (
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
                   {result.generation.message}
+                </div>
+              ) : null}
+              {result.stats.totalReviews > 0 && result.stats.totalReviews < 20 ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-800" role="note">
+                  当前只拿到 {result.stats.totalReviews} 条评论样本，适合做方向性探索；生成 AI 研判前建议先确认样本量是否足够。
                 </div>
               ) : null}
             </section>
@@ -558,22 +656,22 @@ export default function Home({
             </section>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-zinc-500">抓取评论</p>
-              <p className="mt-2 text-2xl font-semibold text-zinc-950">{result.stats.totalReviews}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs">
+              <p className="text-xs font-medium text-zinc-500">抓取样本量</p>
+              <p className="mt-1 text-2xl font-bold text-zinc-950">{result.stats.totalReviews}</p>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-zinc-500">差评占比</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-600">{formatPercent(result.stats.negativeShare)}</p>
+            <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs">
+              <p className="text-xs font-medium text-zinc-500">差评占比 (1-2星)</p>
+              <p className="mt-1 text-2xl font-bold text-rose-600">{formatPercent(result.stats.negativeShare)}</p>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-zinc-500">好评占比</p>
-              <p className="mt-2 text-2xl font-semibold text-emerald-600">{formatPercent(result.stats.positiveShare)}</p>
+            <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs">
+              <p className="text-xs font-medium text-zinc-500">好评占比 (4-5星)</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-600">{formatPercent(result.stats.positiveShare)}</p>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-              <p className="text-sm text-zinc-500">时间范围</p>
-              <p className="mt-2 text-lg font-semibold text-zinc-950">{formatDate(result.stats.oldestReviewDate)} - {formatDate(result.stats.latestReviewDate)}</p>
+            <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-xs">
+              <p className="text-xs font-medium text-zinc-500">评论跨越周期</p>
+              <p className="mt-1 text-base font-semibold text-zinc-900 truncate" suppressHydrationWarning>{formatDate(result.stats.oldestReviewDate)} - {formatDate(result.stats.latestReviewDate)}</p>
             </div>
           </div>
 
@@ -603,10 +701,16 @@ export default function Home({
 
             {visibleInsights ? (
               <>
-                <p className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm leading-7 text-zinc-700">
-                  {visibleInsights.executiveSummary}
-                </p>
-                <div className="mt-4">
+                <div className="rounded-xl border border-teal-200/80 bg-gradient-to-r from-teal-50/70 via-white to-emerald-50/40 p-5 shadow-xs">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-800">
+                    <Sparkles className="h-4 w-4 text-teal-600" />
+                    <span>AI 综合口碑研判</span>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-800 font-medium">
+                    {visibleInsights.executiveSummary}
+                  </p>
+                </div>
+                <div className="mt-5">
                   <InsightGrid insights={visibleInsights} />
                 </div>
                 {visibleInsights.queryAngles.length > 0 ? (
@@ -619,9 +723,38 @@ export default function Home({
                   </div>
                 ) : null}
               </>
+            ) : analyzingAI ? (
+              <div className="rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50/60 via-white to-emerald-50/30 p-6 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-teal-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-teal-900">正在生成 AI 深度口碑研判...</p>
+                    <p className="mt-1 text-xs text-teal-700 leading-relaxed">AI 正在分析 {result.stats.totalReviews} 条评论，提炼核心痛点、产品机会与用户信号。通常需要几十秒，刷新或稍后返回首页可恢复进度。</p>
+                  </div>
+                </div>
+              </div>
+            ) : result.stats.totalReviews > 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-teal-300/70 bg-gradient-to-br from-teal-50/50 via-white to-emerald-50/30 p-6 text-center shadow-xs transition hover:border-teal-400/80 hover:shadow-sm">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-teal-100/80 text-teal-700">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <h3 className="mt-3 text-base font-bold text-zinc-950">一键生成 AI 深度口碑研判</h3>
+                <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500 leading-relaxed">
+                  AI 将分析 {result.stats.totalReviews} 条用户评论，自动提炼产品痛点、改进机会、正面信号与版本风险，每条结论可溯源原文。
+                </p>
+                <button
+                  type="button"
+                  onClick={triggerAIAnalysis}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 active:scale-[0.98]"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  生成 AI 研判报告
+                </button>
+                <p className="mt-3 text-xs text-zinc-500">通常需要几十秒；完成后可查看稳定报告和评论证据。</p>
+              </div>
             ) : (
               <div className="rounded-lg bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500">
-                {result.stats.totalReviews > 0 ? 'AI 洞察暂未生成或需要更新。' : '暂无评论样本。'}
+                暂无评论样本。
               </div>
             )}
           </section>
@@ -651,7 +784,7 @@ export default function Home({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="break-words text-sm font-semibold leading-6 text-zinc-950">{review.title}</h3>
-                      <p className="mt-1 text-xs text-zinc-500">
+                      <p className="mt-1 text-xs text-zinc-500" suppressHydrationWarning>
                         {review.version || 'Unknown'} · {formatDate(review.updated)} · {review.authorName || '匿名'} · {reviewSourceLabel(review.source, review.sourceCountry || review.country)}
                       </p>
                     </div>
@@ -669,38 +802,9 @@ export default function Home({
       ) : (
         <>
           <FeaturedApps apps={featuredApps} currentPage={initialCachePage} />
-          <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-zinc-950">研究能力</h2>
-                <p className="mt-1 text-sm text-zinc-500">先完成单个 App 的证据闭环，再进入机会库做跨 App 研究。</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-teal-700">
-                <Link href="/discover" className="hover:text-teal-900">探索榜单与外部信号 →</Link>
-                <Link href="/opportunities" className="hover:text-teal-900">查看机会库 →</Link>
-              </div>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-                <AlertCircle className="h-5 w-5 text-rose-600" />
-                <h3 className="mt-3 text-base font-semibold text-zinc-950">差评聚类</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">把抱怨压缩成可验证主题，保留原文证据。</p>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-                <Lightbulb className="h-5 w-5 text-amber-600" />
-                <h3 className="mt-3 text-base font-semibold text-zinc-950">需求挖掘</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">从用户表达里提取机会、风险和行动项。</p>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-                <Star className="h-5 w-5 text-emerald-600" />
-                <h3 className="mt-3 text-base font-semibold text-zinc-950">口碑信号</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-500">同时捕捉高分评论里的留存理由。</p>
-              </div>
-            </div>
-          </section>
         </>
       )}
-      <SiteFooter />
+
     </main>
   );
 }

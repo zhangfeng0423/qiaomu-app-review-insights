@@ -175,7 +175,7 @@ export function SiteFooter() {
 
         <div className="flex flex-col gap-3 lg:items-end">
           <SiteAffordances />
-          <p className="text-xs leading-6 text-zinc-500">
+          <p className="text-xs leading-6 text-zinc-500" suppressHydrationWarning>
             © {new Date().getFullYear()} 向阳乔木
           </p>
         </div>

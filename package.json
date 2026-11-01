@@ -2,6 +2,7 @@
   "name": "qiaomu-app-review-insights",
   "version": "0.1.0",
   "private": false,
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:3000": "next dev --turbopack --port 3000",
@@ -22,7 +23,8 @@
     "start:5000": "next start --port 5000",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:hydration": "node scripts/check-hydration.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

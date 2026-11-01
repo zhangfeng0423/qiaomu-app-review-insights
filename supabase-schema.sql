@@ -79,6 +79,45 @@ CREATE TABLE IF NOT EXISTS ai_insights (
 
 CREATE INDEX IF NOT EXISTS idx_ai_insights_generated ON ai_insights(generated_at DESC);
 
+-- 7. 公开洞察页缓存（Serverless / Vercel 部署建议使用）
+CREATE TABLE IF NOT EXISTS app_review_pages (
+  cache_key TEXT PRIMARY KEY,
+  country TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  generated_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_review_pages_updated ON app_review_pages(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_app_review_pages_app ON app_review_pages(app_id, country);
+
+-- 8. 公开生成限流状态与记录
+CREATE TABLE IF NOT EXISTS app_review_generation_states (
+  day DATE NOT NULL,
+  client_key TEXT NOT NULL,
+  generated_app_keys TEXT[] NOT NULL DEFAULT '{}',
+  queued_app_keys TEXT[] NOT NULL DEFAULT '{}',
+  refreshed_app_at JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY(day, client_key)
+);
+
+CREATE TABLE IF NOT EXISTS app_review_generation_queue (
+  day DATE NOT NULL,
+  client_key TEXT NOT NULL,
+  app_key TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  app_name TEXT,
+  country TEXT NOT NULL,
+  query TEXT,
+  reason TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY(day, client_key, app_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_review_generation_queue_created ON app_review_generation_queue(created_at DESC);
+
 -- 创建更新时间触发器
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

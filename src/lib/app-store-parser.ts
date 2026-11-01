@@ -20,12 +20,13 @@ export function parseAppStoreUrl(url: string): ParsedAppInfo | null {
     const urlObj = new URL(url);
     
     // 检查是否是 App Store URL
-    if (!urlObj.hostname.includes('apple.com')) {
+    if (!['apps.apple.com', 'itunes.apple.com'].includes(urlObj.hostname.toLowerCase())
+      || !['https:', 'http:'].includes(urlObj.protocol)) {
       return null;
     }
 
     // 提取应用 ID
-    const idMatch = url.match(/id(\d+)/);
+    const idMatch = urlObj.pathname.match(/\/id(\d+)(?:\/|$)/);
     if (!idMatch) {
       return null;
     }
@@ -93,7 +94,7 @@ export function validateAppId(id: string): boolean {
 export function validateAppStoreUrl(url: string): boolean {
   try {
     const urlObj = new URL(url);
-    return urlObj.hostname.includes('apple.com') && /id\d+/.test(url);
+    return Boolean(parseAppStoreUrl(urlObj.toString()));
   } catch {
     return false;
   }

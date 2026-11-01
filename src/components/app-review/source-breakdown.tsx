@@ -40,10 +40,10 @@ function countrySummary(countries: ReviewSourceCountryBreakdown[]) {
 
 export function reviewSourceLabel(source?: string, country?: string) {
   const sourceText = source === 'app-store-html'
-    ? '页面补样本'
+    ? '网页抓取样本'
     : source === 'apple-rss'
-      ? 'RSS 最近评论'
-      : '来源待识别';
+      ? '最新用户原声'
+      : 'App Store';
   const countryText = country ? ` · ${formatCountry(country)}` : '';
   return `${sourceText}${countryText}`;
 }
@@ -55,11 +55,11 @@ export function ReviewSourceBreakdownPanel({ breakdown, className = '' }: Review
   );
 
   return (
-    <section className={`rounded-lg border border-zinc-200 bg-white p-5 shadow-sm ${className}`}>
+    <section className={`rounded-xl border border-zinc-200/80 bg-white p-5 shadow-sm ${className}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-zinc-950">数据来源</h2>
-          <p className="mt-1 text-sm text-zinc-500">展示本页评论样本的抓取构成和边界。</p>
+          <h2 className="text-base font-bold text-zinc-900">数据样本与透明度说明</h2>
+          <p className="mt-0.5 text-xs text-zinc-500">本报告提取自公开 App Store 真实用户评价样本，保留数据边界与追溯性。</p>
         </div>
         <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs text-zinc-500">
           {hasPartialTracking

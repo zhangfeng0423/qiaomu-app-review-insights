@@ -1,9 +1,9 @@
 'use client';
+import { requestResearch } from '@/lib/research-request';
 
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { ArrowUpRight, Bot, ChevronsUpDown, Loader2, RefreshCw, Trophy } from 'lucide-react';
-import { RewardSupportDialog } from '@/components/app-review/site-footer';
 import { Button } from '@/components/ui/button';
 
 type TopChartType = 'free' | 'paid';
@@ -72,7 +72,6 @@ export function TopChartsSection({ countries, categories, initialApps }: TopChar
   const [loading, setLoading] = useState(false);
   const [generatingId, setGeneratingId] = useState('');
   const [error, setError] = useState('');
-  const [rewardOpen, setRewardOpen] = useState(false);
 
   const title = useMemo(
     () => `${optionLabel(countries, country)} · ${optionLabel(categories, category)} · ${chartLabel(chart)} Top 10`,
@@ -121,17 +120,7 @@ export function TopChartsSection({ countries, categories, initialApps }: TopChar
     setError('');
 
     try {
-      const response = await fetch('/api/research', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: app.id,
-          country: app.country,
-          maxReviews: 160,
-          analyze: true,
-        }),
-      });
-      const payload = await response.json() as ApiResponse<{
+      const data = await requestResearch<{
         pageUrl: string;
         updatedAt: string;
         stats: {
@@ -144,27 +133,20 @@ export function TopChartsSection({ countries, categories, initialApps }: TopChar
           status: 'cached' | 'generated' | 'deduped' | 'queued';
           message?: string;
         };
-      }>;
-
-      if (!response.ok || !payload.success || !payload.data) {
-        if (response.status === 429) {
-          setRewardOpen(true);
-        }
-        throw new Error(payload.error || '生成洞察失败');
-      }
-      if (payload.data.generation?.status === 'queued') {
-        setRewardOpen(true);
+      }>('/api/research', {query:app.id,country:app.country,maxReviews:160,analyze:true});
+      if (data.generation?.status === 'queued') {
+        setError(data.generation.message || '今日公开生成额度已用完，请稍后再试。');
       }
 
       setApps((items) => items.map((item) => item.id === app.id ? {
         ...item,
         cached: {
-          pagePath: payload.data!.pageUrl,
-          updatedAt: payload.data!.updatedAt,
-          totalReviews: payload.data!.stats.totalReviews,
-          averageRating: payload.data!.stats.averageRating,
-          negativeShare: payload.data!.stats.negativeShare,
-          hasInsights: Boolean(payload.data!.insights),
+          pagePath: data.pageUrl,
+          updatedAt: data.updatedAt,
+          totalReviews: data.stats.totalReviews,
+          averageRating: data.stats.averageRating,
+          negativeShare: data.stats.negativeShare,
+          hasInsights: Boolean(data.insights),
         },
       } : item));
     } catch (generateError) {
@@ -238,7 +220,7 @@ export function TopChartsSection({ countries, categories, initialApps }: TopChar
 
         <div className="mt-4 divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-100">
           {apps.map((app) => (
-            <div key={`${app.country}-${app.chart}-${app.category}-${app.id}`} className="grid gap-3 bg-white p-3 md:grid-cols-[42px_minmax(0,1fr)_220px] md:items-center">
+            <div key={`${app.country}-${app.chart}-${app.category}-${app.id}`} className="grid min-w-0 gap-3 bg-white p-3 md:grid-cols-[42px_minmax(0,1fr)_220px] md:items-center">
               <div className="text-center text-lg font-semibold text-zinc-400">#{app.rank}</div>
               <div className="flex min-w-0 gap-3">
                 {app.artworkUrl ? (
@@ -289,7 +271,6 @@ export function TopChartsSection({ countries, categories, initialApps }: TopChar
           ))}
         </div>
       </div>
-      <RewardSupportDialog open={rewardOpen} onOpenChange={setRewardOpen} />
     </section>
   );
 }

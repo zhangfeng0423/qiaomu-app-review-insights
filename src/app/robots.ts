@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/settings', '/prompts'],
     },
-    sitemap: 'https://appreview.qiaomu.ai/sitemap.xml',
+    sitemap: `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://appreview.qiaomu.ai').replace(/\/$/,'')}/sitemap.xml`,
   };
 }

@@ -1,4 +1,4 @@
-import { parseAppStoreUrl, validateAppId } from '@/lib/app-store-parser';
+import { COUNTRY_MAPPING, parseAppStoreUrl, validateAppId } from '@/lib/app-store-parser';
 
 export interface AppStoreLookupResult {
   id: string;
@@ -40,6 +40,19 @@ interface ITunesSearchResponse {
 }
 
 const ITUNES_BASE_URL = 'https://itunes.apple.com';
+
+export function validateResearchInput(query: string, country?: string) {
+  if (!query.trim()) throw new Error('请输入 App Store 链接、App ID 或应用名称');
+  if (query.length > 600) throw new Error('输入内容过长，请只输入应用名称、ID 或 App Store 链接');
+  const region = (country || 'cn').trim().toLowerCase();
+  if (!COUNTRY_MAPPING[region]) throw new Error('不支持这个国家或地区，请重新选择 App Store 地区');
+  if (/^\d+$/.test(query) && !/^\d{5,12}$/.test(query)) throw new Error('无效 App ID，请检查数字是否完整');
+  if (/^(?:[a-z][a-z0-9+.-]*:\/\/|www\.)/i.test(query)) {
+    const parsed = parseAppStoreUrl(query);
+    if (!parsed) throw new Error('无效 App Store 链接，请复制 apps.apple.com 中的应用详情链接');
+    if (!COUNTRY_MAPPING[parsed.country]) throw new Error('不支持链接中的国家或地区，请换用对应地区的 App Store 链接');
+  }
+}
 
 export function normalizeCountry(country?: string): string {
   const cleaned = (country || 'cn').trim().toLowerCase();
@@ -83,10 +96,12 @@ async function fetchItunes<T>(url: string): Promise<T> {
     });
 
     if (!response.ok) {
-      throw new Error(`Apple API returned HTTP ${response.status}`);
+      throw new Error('App Store 暂时无法连接，请稍后重试');
     }
 
-    return response.json() as Promise<T>;
+    return await response.json() as T;
+  } catch {
+    throw new Error('App Store 请求失败或超时，请稍后重试');
   } finally {
     clearTimeout(timeout);
   }
@@ -121,6 +136,7 @@ export async function searchApps(term: string, country = 'cn', limit = 5): Promi
 
 export async function resolveAppQuery(query: string, country = 'cn'): Promise<AppResolution> {
   const trimmed = query.trim();
+  validateResearchInput(trimmed,country);
   if (!trimmed) {
     throw new Error('请输入 App Store 链接、App ID 或应用名称');
   }
@@ -132,18 +148,7 @@ export async function resolveAppQuery(query: string, country = 'cn'): Promise<Ap
       return { app, candidates: [app], source: 'url' };
     }
 
-    return {
-      app: {
-        id: parsedUrl.id,
-        name: parsedUrl.name,
-        country: parsedUrl.country,
-        artistName: '',
-        artworkUrl: '',
-        trackViewUrl: trimmed,
-      },
-      candidates: [],
-      source: 'url',
-    };
+    throw new Error(`没有在 ${parsedUrl.country.toUpperCase()} 区找到 App ID ${parsedUrl.id}`);
   }
 
   if (validateAppId(trimmed)) {

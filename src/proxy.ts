@@ -12,6 +12,9 @@ function requiresAdmin(request: NextRequest) {
     || pathname === '/api/debug-db'
   ) return true;
   if (pathname.startsWith('/api/test-')) return true;
+  if (pathname === '/api/translate') return true;
+  // These legacy GET routes may call paid models on a cache miss.
+  if (/^\/api\/apps\/[^/]+\/ai-(themes|trends|insights)$/.test(pathname)) return true;
   if (pathname === '/api/apps' && method !== 'GET') return true;
   if (pathname.startsWith('/api/apps/') && method !== 'GET') {
     return !pathname.endsWith('/reviews') && !pathname.endsWith('/stats') && !pathname.endsWith('/analysis') && !pathname.endsWith('/ai-themes') && !pathname.endsWith('/ai-trends') && !pathname.endsWith('/ai-insights') && !pathname.endsWith('/analyze-progress') && !pathname.endsWith('/export-report');

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { AlertCircle, Apple, ArrowLeft, ArrowUpRight, Lightbulb, Search, ShieldCheck, Star, Target, TrendingDown } from 'lucide-react';
+import { AlertCircle, Apple, ArrowLeft, ArrowUpRight, Lightbulb, Search, ShieldCheck, Sparkles, Star, Target, TrendingDown } from 'lucide-react';
 import { InsightGrid } from '@/components/app-review/insight-cards';
 import { RegenerateButton } from '@/components/app-review/regenerate-button';
 import { BrandMark, SiteFooter } from '@/components/app-review/site-footer';
@@ -9,6 +9,7 @@ import { ReviewSourceBreakdownPanel, reviewSourceLabel } from '@/components/app-
 import { VersionDiagnosticsPanel } from '@/components/app-review/version-diagnostics';
 import { ResearchHistoryPanel } from '@/components/app-review/research-history';
 import { CountryComparisonPanel } from '@/components/app-review/country-comparison';
+import { DetailClient } from '@/components/app-review/detail-client';
 import {
   CachedAppReviewPage,
   buildAppPagePath,
@@ -178,10 +179,10 @@ export default async function AppInsightPage({ params }: PageProps) {
     publisher: {
       '@type': 'Organization',
       name: '乔木 App 洞察',
-      url: 'https://appreview.qiaomu.ai',
+      url: buildCanonicalUrl('/'),
       logo: {
         '@type': 'ImageObject',
-        url: 'https://appreview.qiaomu.ai/logo.svg',
+        url: buildCanonicalUrl('/logo.svg'),
       },
     },
     mainEntity: {
@@ -197,28 +198,158 @@ export default async function AppInsightPage({ params }: PageProps) {
     },
   };
 
+  const totalInsightsCount = insights
+    ? (insights.painPoints?.length || 0) +
+      (insights.opportunities?.length || 0) +
+      (insights.positiveSignals?.length || 0) +
+      (insights.userSegments?.length || 0) +
+      (insights.versionRisks?.length || 0) +
+      (insights.actionPlan?.length || 0)
+    : 0;
+
+  // 1. 核心洞察 Tab 内容
+  const insightsTabContent = (
+    <div className="space-y-6">
+      {insights ? (
+        <InsightGrid insights={insights} />
+      ) : (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-8 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-amber-100 text-amber-700">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h3 className="mt-3 text-lg font-bold text-zinc-950">AI 洞察尚未生成</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-zinc-600">
+            {page.aiError || '当前仅抓取了原始评论数据。点击右上角的“更新洞察”即可调用 AI 提炼痛点与机会。'}
+          </p>
+          <div className="mt-5 flex justify-center">
+            <RegenerateButton appId={page.app.id} country={page.app.country} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // 2. 趋势与评分分布 Tab 内容
+  const trendsTabContent = (
+    <div className="space-y-6">
+      {/* 评分星级与版本分布总览 */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-zinc-900">评分星级分布</h3>
+            <span className="text-xs text-zinc-500">共 {page.stats.totalReviews} 条评分</span>
+          </div>
+          <div className="mt-4 space-y-2.5">
+            {[5, 4, 3, 2, 1].map((rating) => {
+              const count = ratingCount(page, rating);
+              const width = `${Math.max(3, Math.round((count / maxBucket) * 100))}%`;
+              return (
+                <div key={rating} className="grid grid-cols-[36px_minmax(0,1fr)_48px] items-center gap-3 text-xs text-zinc-600">
+                  <span className="font-medium">{rating} 星</span>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
+                    <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width }} />
+                  </div>
+                  <span className="text-right font-medium text-zinc-900">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-zinc-900">主要版本样本</h3>
+            <span className="text-xs text-zinc-500">按近期活跃度</span>
+          </div>
+          <div className="mt-4 space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
+            {page.stats.versionDistribution.length === 0 ? (
+              <p className="text-xs text-zinc-600">暂无版本细分。</p>
+            ) : (
+              page.stats.versionDistribution.map((version) => (
+                <div key={version.version} className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50/70 px-3 py-2 text-xs">
+                  <span className="font-semibold text-zinc-900">v{version.version}</span>
+                  <span className="text-zinc-500">{version.count} 条 · ★ {version.averageRating}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <VersionDiagnosticsPanel diagnostics={diagnostics} appName={page.app.name} />
+      <ResearchHistoryPanel snapshots={historySnapshots} changes={historyChanges} />
+      <CountryComparisonPanel comparison={countryComparison} />
+    </div>
+  );
+
+  // 3. 用户原声证据 Tab 内容
+  const evidenceTabContent = (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+        <div>
+          <h3 className="text-base font-bold text-zinc-950">真实用户评论样本</h3>
+          <p className="text-xs text-zinc-500">每条 AI 结论均保留对应的真实评论出处，支持回溯验证</p>
+        </div>
+        <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-semibold text-zinc-600">
+          共 {page.reviews.length} 条代表性样本
+        </span>
+      </div>
+
+      <div className="grid gap-3">
+        {page.reviews.map((review) => (
+          <article key={review.id} className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition hover:border-zinc-300">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
+                    <Star className="h-3 w-3 fill-current" />
+                    {review.rating}
+                  </span>
+                  <h4 className="break-words text-sm font-bold text-zinc-950">{review.title}</h4>
+                </div>
+                <p className="mt-1 text-xs text-zinc-600" suppressHydrationWarning>
+                  {review.version ? `v${review.version}` : '版本未知'} · {formatDate(review.updated)} · {review.authorName || '匿名用户'} · {reviewSourceLabel(review.source, review.sourceCountry || review.country)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 break-words text-sm leading-relaxed text-zinc-700">{review.content}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <main className="min-h-screen bg-[#f7f7f4] text-zinc-950">
+    <main className="min-h-screen bg-[#f8f9fa] text-zinc-950">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <header className="border-b border-zinc-200 bg-white/90">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+
+      {/* 顶部极简导航 */}
+      <header className="border-b border-zinc-200/80 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
             <BrandMark compact />
           </Link>
-          <Link href="/" className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-950">
-            <ArrowLeft className="h-4 w-4" />
-            返回搜索
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 shadow-sm"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              返回搜索
+            </Link>
+          </div>
         </div>
       </header>
 
-      <section className="border-b border-zinc-200 bg-[#fdfdfb]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
-          <div className="min-w-0">
-            <div className="flex min-w-0 gap-4">
+      {/* 核心档案与 AI 执行摘要 (结论先行) */}
+      <section className="border-b border-zinc-200/80 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+          {/* App 基础信息栏 */}
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 gap-4 sm:gap-5">
               {page.app.artworkUrl ? (
                 <Image
                   src={page.app.artworkUrl}
@@ -235,177 +366,123 @@ export default async function AppInsightPage({ params }: PageProps) {
               )}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs text-teal-700">
+                  <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold text-teal-700">
                     {page.app.country.toUpperCase()} 区
                   </span>
                   {page.app.primaryGenreName ? (
-                    <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-500">
+                    <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs font-medium text-zinc-600">
                       {page.app.primaryGenreName}
                     </span>
                   ) : null}
                 </div>
-                <h1 className="mt-3 break-words text-3xl font-semibold leading-tight text-zinc-950 sm:text-4xl">
-                  {page.app.name} 评价分析
+                <h1 className="mt-2.5 break-words text-2xl font-extrabold leading-tight text-zinc-950 sm:text-3xl">
+                  {page.app.name}
                 </h1>
-                <p className="mt-2 text-sm text-zinc-500">{page.app.artistName || 'App Store'} · 更新于 {formatDate(page.updatedAt)}</p>
-                <p className="mt-4 max-w-3xl text-base leading-7 text-zinc-700">
-                  本页基于 App Store 用户评价生成，面向产品分析和竞品研究，保留评论证据、来源构成和样本边界，并提炼可行动信号。
+                <p className="mt-1 text-xs text-zinc-500" suppressHydrationWarning>
+                  {page.app.artistName || 'App Store 开发者'} · 更新于 {formatDate(page.updatedAt)}
                 </p>
               </div>
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
+
+            {/* 操作与 App Store 按钮 */}
+            <div className="flex flex-wrap items-center gap-2.5 self-start">
               {page.app.trackViewUrl ? (
                 <a
                   href={page.app.trackViewUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-950"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-950 shadow-sm"
                 >
-                  App Store
-                  <ArrowUpRight className="h-4 w-4" />
+                  App Store 原页
+                  <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               ) : null}
               <RegenerateButton appId={page.app.id} country={page.app.country} />
             </div>
           </div>
 
-          <aside className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-zinc-500">样本均分</p>
-            <div className="mt-2 flex items-end gap-2">
-              <span className="text-4xl font-semibold text-zinc-950">{page.stats.averageRating || '0.00'}</span>
-              <span className="pb-1 text-sm text-zinc-500">/ 5</span>
+          {/* AI 核心研判速览 (结论先行) */}
+          <div className="rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50/60 via-white to-emerald-50/40 p-5 sm:p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-800">
+                <Sparkles className="h-4 w-4 text-teal-600" />
+                AI 用户口碑综合研判
+              </div>
+              <span className="text-xs text-zinc-600">
+                分析模型：{page.model?.model || 'DeepSeek Flash'}
+              </span>
             </div>
-            <div className="mt-4 space-y-2">
-              {[5, 4, 3, 2, 1].map((rating) => {
-                const count = ratingCount(page, rating);
-                const width = `${Math.max(3, Math.round((count / maxBucket) * 100))}%`;
-                return (
-                  <div key={rating} className="grid grid-cols-[28px_minmax(0,1fr)_42px] items-center gap-2 text-xs text-zinc-500">
-                    <span>{rating} 星</span>
-                    <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
-                      <div className="h-full rounded-full bg-amber-400" style={{ width }} />
-                    </div>
-                    <span className="text-right">{count}</span>
-                  </div>
-                );
-              })}
+
+            {insights?.executiveSummary ? (
+              <p className="mt-3 text-base leading-relaxed font-medium text-zinc-800">
+                {insights.executiveSummary}
+              </p>
+            ) : (
+              <p className="mt-3 text-sm text-zinc-700">
+                {page.aiError || '当前展示评论基础数据统计，点击右上角更新可生成 AI 洞察。'}
+              </p>
+            )}
+
+            {/* 4 核心数据胶囊 */}
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-xs">
+                <p className="text-xs font-medium text-zinc-600">用户评分</p>
+                <p className="mt-1 text-xl font-bold text-zinc-950">★ {page.stats.averageRating || '0.0'}</p>
+              </div>
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-xs">
+                <p className="text-xs font-medium text-zinc-600">差评痛点占比</p>
+                <p className="mt-1 text-xl font-bold text-rose-600">{formatPercent(page.stats.negativeShare)}</p>
+              </div>
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-xs">
+                <p className="text-xs font-medium text-zinc-600">好评认同占比</p>
+                <p className="mt-1 text-xl font-bold text-emerald-600">{formatPercent(page.stats.positiveShare)}</p>
+              </div>
+              <div className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-xs">
+                <p className="text-xs font-medium text-zinc-600">分析样本总数</p>
+                <p className="mt-1 text-xl font-bold text-zinc-900">{page.stats.totalReviews} 条</p>
+              </div>
             </div>
-          </aside>
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-4 py-6 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-zinc-500">评论样本</p>
-          <p className="mt-2 text-2xl font-semibold text-zinc-950">{page.stats.totalReviews}</p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-zinc-500">差评占比</p>
-          <p className="mt-2 text-2xl font-semibold text-rose-600">{formatPercent(page.stats.negativeShare)}</p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-zinc-500">好评占比</p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-600">{formatPercent(page.stats.positiveShare)}</p>
-        </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-zinc-500">模型</p>
-          <p className="mt-2 truncate text-lg font-semibold text-zinc-950">{page.model?.model || '评论统计'}</p>
-        </div>
-      </section>
+      {/* 主体交互区域：三大 Tab 渐进式呈现 */}
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-10">
+        <DetailClient
+          insightsCount={totalInsightsCount}
+          reviewsCount={page.reviews.length}
+          insightsTabContent={insightsTabContent}
+          trendsTabContent={trendsTabContent}
+          evidenceTabContent={evidenceTabContent}
+        />
 
-      <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-        <ReviewSourceBreakdownPanel breakdown={page.sourceBreakdown} />
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-zinc-950">摘要</h2>
-          {insights ? (
-            <p className="mt-3 text-base leading-8 text-zinc-700">{insights.executiveSummary}</p>
-          ) : (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{page.aiError || 'AI 洞察暂未生成或需要更新；页面仍保留评分、版本和评论证据。'}</span>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <VersionDiagnosticsPanel diagnostics={diagnostics} appName={page.app.name} />
-
-      <ResearchHistoryPanel snapshots={historySnapshots} changes={historyChanges} />
-
-      <CountryComparisonPanel comparison={countryComparison} />
-
-      {insights ? (
-        <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-          <InsightGrid insights={insights} />
+        {/* 底部收纳：数据透明度说明 */}
+        <section className="pt-6 border-t border-zinc-200/70">
+          <ReviewSourceBreakdownPanel breakdown={page.sourceBreakdown} />
         </section>
-      ) : null}
 
-      <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-zinc-950">版本样本</h2>
-            <div className="mt-4 space-y-3">
-              {page.stats.versionDistribution.length === 0 ? (
-                <p className="text-sm text-zinc-500">暂无版本样本。</p>
-              ) : page.stats.versionDistribution.map((version) => (
-                <div key={version.version} className="rounded-md border border-zinc-100 bg-zinc-50 p-3">
-                  <p className="truncate text-sm font-semibold text-zinc-900">{version.version}</p>
-                  <p className="mt-2 text-xs text-zinc-500">{version.count} 条 · {version.averageRating} 星</p>
-                </div>
-              ))}
+        {/* 页面使用帮助 */}
+        <section className="rounded-2xl border border-zinc-200/70 bg-white p-6 shadow-sm">
+          <div className="grid gap-6 sm:grid-cols-3">
+            <div>
+              <TrendingDown className="h-5 w-5 text-rose-600" />
+              <h3 className="mt-2.5 text-sm font-bold text-zinc-950">如何应用这些痛点？</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">重点关注高频差评中的产品稳定性、付费阻力及竞品遗留缺陷，可直接作为产品迭代的需求池依据。</p>
             </div>
-          </aside>
+            <div>
+              <Lightbulb className="h-5 w-5 text-amber-600" />
+              <h3 className="mt-2.5 text-sm font-bold text-zinc-950">如何发现产品机会？</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">用户在三星与差评中反复呼吁却长期未被满足的特性，往往是新产品切入的绝佳利基点。</p>
+            </div>
+            <div>
+              <Target className="h-5 w-5 text-teal-600" />
+              <h3 className="mt-2.5 text-sm font-bold text-zinc-950">证据核对保障</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">随时切换至“用户原声证据”Tab，即可直接查阅每条结论对应的用户原声，确保决策严谨有据。</p>
+            </div>
+          </div>
+        </section>
+      </div>
 
-          <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-zinc-950">评论证据</h2>
-              <span className="text-sm text-zinc-500">{page.reviews.length} 条精选样本</span>
-            </div>
-            <div className="space-y-3">
-              {page.reviews.map((review) => (
-                <article key={review.id} className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="break-words text-sm font-semibold leading-6 text-zinc-950">{review.title}</h3>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {review.version || 'Unknown'} · {formatDate(review.updated)} · {review.authorName || '匿名'} · {reviewSourceLabel(review.source, review.sourceCountry || review.country)}
-                      </p>
-                    </div>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-white px-2 py-1 text-xs text-amber-700">
-                      <Star className="h-3.5 w-3.5 fill-current" />
-                      {review.rating}
-                    </span>
-                  </div>
-                  <p className="mt-3 break-words text-sm leading-7 text-zinc-700">{review.content}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section className="border-t border-zinc-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-3 lg:px-8">
-          <div>
-            <TrendingDown className="h-5 w-5 text-rose-600" />
-            <h2 className="mt-3 text-base font-semibold text-zinc-950">这个页面适合团队怎么用？</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">同一个链接里保留摘要、更新时间和评论证据，方便产品、运营和研发对齐同一版结论。</p>
-          </div>
-          <div>
-            <Lightbulb className="h-5 w-5 text-amber-600" />
-            <h2 className="mt-3 text-base font-semibold text-zinc-950">这些结论可靠吗？</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">页面保留摘要、证据、痛点和行动项，每个判断都尽量回到原始评论样本。</p>
-          </div>
-          <div>
-            <Target className="h-5 w-5 text-teal-600" />
-            <h2 className="mt-3 text-base font-semibold text-zinc-950">数据如何更新？</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">页面记录更新时间，可点击更新洞察，抓取最新评论并更新当前页面。</p>
-          </div>
-        </div>
-      </section>
       <SiteFooter />
     </main>
   );

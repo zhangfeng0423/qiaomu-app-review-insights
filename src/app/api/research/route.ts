@@ -4,6 +4,7 @@ import {
   CachedAppReviewPage,
   ReviewSourceBreakdown,
   generateCachedReviewPage,
+  hasMeaningfulInsights,
   readCachedReviewPage,
   resolveAppForCache,
 } from '@/lib/appstore/cache';
@@ -14,13 +15,17 @@ import {
   isFreshCachedPage,
   publicCacheFreshDays,
   runGuardedPublicGeneration,
+  setGenerationCookie,
 } from '@/lib/appstore/generation-guard';
-import { normalizeCountry, AppStoreLookupResult } from '@/lib/appstore/discovery';
+import { normalizeCountry, validateResearchInput, AppStoreLookupResult } from '@/lib/appstore/discovery';
 import { ReviewStats } from '@/lib/appstore/review-summary';
-import { ApiResponse, AppStoreReview } from '@/types';
+import { AppStoreReview } from '@/types';
+import { shouldUseSupabaseGenerationGuard } from '@/lib/server/supabase';
+import { durableJobResponse } from '@/lib/appstore/job-response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 interface ResearchRequest {
   query?: string;
@@ -68,12 +73,36 @@ function safeErrorMessage(error: unknown): string {
   return error.message;
 }
 
-function shouldGeneratePage(page: CachedAppReviewPage | null, options: {
+function isClientInputError(message: string) {
+  return /请输入|没有找到|没有在 .* 区找到|无效 App|不支持|输入内容过长/.test(message);
+}
+
+function resetTimeLabel(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '明天 UTC 00:00';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Shanghai',
+  }).format(date);
+}
+
+function resetAfterSeconds(value: string) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return 3600;
+  return Math.max(1, Math.ceil((timestamp - Date.now()) / 1000));
+}
+
+export function shouldGeneratePage(page: CachedAppReviewPage | null, options: {
   force: boolean;
   freshDays: number;
+  analyze: boolean;
 }) {
   if (!page) return true;
   if (options.force) return true;
+  if (options.analyze && (!hasMeaningfulInsights(page.insights) || Boolean(page.aiError))) return true;
   if (isFreshCachedPage(page, options.freshDays)) return false;
   return true;
 }
@@ -101,10 +130,17 @@ function researchResponse(
   };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<ResearchResponse>>> {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as ResearchRequest;
     const query = String(body.query || '').trim();
+    validateResearchInput(query,body.country);
+    if (!query) {
+      return setGenerationCookie(
+        NextResponse.json({ success: false, error: '请输入 App 名称、App Store 链接或 App ID' }, { status: 400 }),
+        request
+      );
+    }
     const country = normalizeCountry(body.country);
     const maxReviews = clampReviewLimit(body.maxReviews);
     const shouldAnalyze = body.analyze !== false;
@@ -115,16 +151,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     const resolvedCountry = normalizeCountry(resolution.app.country);
     const existing = await readCachedReviewPage(resolvedCountry, resolution.app.id);
 
-    if (!shouldGeneratePage(existing, { force, freshDays })) {
-      return NextResponse.json({
+    if (!shouldGeneratePage(existing, { force, freshDays, analyze: shouldAnalyze })) {
+      return setGenerationCookie(NextResponse.json({
         success: true,
-        data: researchResponse(existing!, true, {
+        data: researchResponse({...existing!,candidates:resolution.candidates,source:resolution.source}, true, {
           status: 'cached',
         }),
-      });
+      }), request);
     }
 
     const appKey = appGenerationKey(resolvedCountry, resolution.app.id);
+    if (shouldUseSupabaseGenerationGuard()) {
+      return await durableJobResponse(request, {
+        appId:resolution.app.id, country:resolvedCountry, maxReviews, analyze:shouldAnalyze,
+        resolution,
+        force:force || Boolean(existing && !isFreshCachedPage(existing,freshDays)),
+      });
+    }
     const generation = await runGuardedPublicGeneration({
       request,
       appKey,
@@ -148,39 +191,43 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
     if (generation.status === 'queued') {
       const message = existing
-        ? '今天的新 App 生成次数已用完，已记录这个 App。你可以先查看已有洞察页，稍后再回来更新。'
-        : '今天的新 App 生成次数已用完，已记录这个 App，稍后会进入后台生成队列。';
+        ? `今天的新 App 生成次数已用完，当前报告保持不变。额度将在 ${resetTimeLabel(generation.limit.resetAt)} 重置。`
+        : `今天的新 App 生成次数已用完，本次没有开始抓取。额度将在 ${resetTimeLabel(generation.limit.resetAt)} 重置后再试。`;
 
       if (existing) {
-        return NextResponse.json({
+        return setGenerationCookie(NextResponse.json({
           success: true,
           data: researchResponse(existing, true, {
             status: 'queued',
             message,
             limit: generation.limit,
           }),
-        });
+        }), request);
       }
 
-      return NextResponse.json({ success: false, error: message }, { status: 429 });
+      return setGenerationCookie(NextResponse.json(
+        { success: false, error: message },
+        { status: 429, headers: { 'Retry-After': String(resetAfterSeconds(generation.limit.resetAt)) } }
+      ), request);
     }
 
     const { page, cached } = generation.result;
 
-    return NextResponse.json({
+    return setGenerationCookie(NextResponse.json({
       success: true,
       data: researchResponse(page, cached, {
         status: cached ? 'cached' : generation.status,
       }),
-    });
+    }), request);
   } catch (error) {
     console.error('Research request failed:', error);
-    return NextResponse.json(
+    const message = safeErrorMessage(error);
+    return setGenerationCookie(NextResponse.json(
       {
         success: false,
-        error: safeErrorMessage(error),
+        error: message,
       },
-      { status: 500 }
-    );
+      { status: isClientInputError(message) ? 400 : 502 }
+    ), request);
   }
 }

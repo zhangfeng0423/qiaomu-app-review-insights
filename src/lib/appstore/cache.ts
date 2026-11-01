@@ -16,6 +16,7 @@ import { upsertReviewHistory } from '@/lib/appstore/review-history';
 import { ReviewStats, sortReviewsForAnalysis, summarizeReviews } from '@/lib/appstore/review-summary';
 import { prepareReviewCorpus } from '@/lib/analysis/review-preprocessor';
 import { selectCachedPage, CachedPageSelectionOperation, CachedPageSelectionResult } from '@/lib/appstore/cached-page-selection';
+import { getServerSupabase, shouldUseSupabasePersistence } from '@/lib/server/supabase';
 import { AggregatedAnalysis, App, AppReviewSource, AppStoreReview } from '@/types';
 
 export interface CachedModelInfo {
@@ -368,6 +369,62 @@ async function atomicWriteJson(filePath: string, data: unknown) {
   await fs.rename(tmpPath, filePath);
 }
 
+async function readSupabaseReviewPage(country: string, appId: string) {
+  const { data, error } = await getServerSupabase()
+    .from('app_review_pages')
+    .select('payload')
+    .eq('cache_key', safeCacheKey(country, appId))
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.payload ? hydrateCachedReviewPage(data.payload as CachedAppReviewPage) : null;
+}
+
+async function listSupabaseReviewPages() {
+  const { data, error } = await getServerSupabase()
+    .from('app_review_pages')
+    .select('payload')
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || [])
+    .map((row) => row.payload ? hydrateCachedReviewPage(row.payload as CachedAppReviewPage) : null)
+    .filter((page): page is CachedAppReviewPage => Boolean(page?.app?.id));
+}
+
+async function writeCachedReviewPage(country: string, appId: string, page: CachedAppReviewPage) {
+  if (shouldUseSupabasePersistence()) {
+    const { error } = await getServerSupabase()
+      .from('app_review_pages')
+      .upsert({
+        cache_key: safeCacheKey(country, appId),
+        country: normalizeCountry(country),
+        app_id: appId,
+        payload: page,
+        generated_at: page.generatedAt,
+        updated_at: page.updatedAt,
+      }, { onConflict: 'cache_key' });
+
+    if (error) throw error;
+    return;
+  }
+
+  await atomicWriteJson(cacheFilePath(country, appId), page);
+}
+
+async function deleteStoredReviewPage(country: string, appId: string) {
+  if (shouldUseSupabasePersistence()) {
+    const { error } = await getServerSupabase()
+      .from('app_review_pages')
+      .delete()
+      .eq('cache_key', safeCacheKey(country, appId));
+    if (error) throw error;
+    return;
+  }
+
+  await fs.unlink(cacheFilePath(country, appId));
+}
+
 export async function resolveAppForCache(options: GenerateCachedReviewOptions): Promise<AppResolution> {
   const country = normalizeCountry(options.country);
 
@@ -383,6 +440,10 @@ export async function resolveAppForCache(options: GenerateCachedReviewOptions): 
 }
 
 export async function readCachedReviewPage(country: string, appId: string): Promise<CachedAppReviewPage | null> {
+  if (shouldUseSupabasePersistence()) {
+    return readSupabaseReviewPage(country, appId);
+  }
+
   try {
     const content = await fs.readFile(cacheFilePath(country, appId), 'utf8');
     return hydrateCachedReviewPage(JSON.parse(content) as CachedAppReviewPage);
@@ -393,14 +454,18 @@ export async function readCachedReviewPage(country: string, appId: string): Prom
 }
 
 export async function listCachedReviewPages(): Promise<CachedAppReviewPage[]> {
+  if (shouldUseSupabasePersistence()) {
+    return listSupabaseReviewPages();
+  }
+
   try {
-    const files = await fs.readdir(cacheRoot());
+    const files = await fs.readdir(/* turbopackIgnore: true */ cacheRoot());
     const pages = await Promise.all(
       files
         .filter(isOfficialCacheFile)
         .map(async (file) => {
           try {
-            const content = await fs.readFile(path.join(cacheRoot(), file), 'utf8');
+            const content = await fs.readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ cacheRoot(), file), 'utf8');
             return hydrateCachedReviewPage(JSON.parse(content) as CachedAppReviewPage);
           } catch {
             return null;
@@ -455,9 +520,9 @@ export async function updateCachedReviewPageMetadata(
     canonicalUrl: buildCanonicalUrl(buildAppPagePath(app)),
     updatedAt: new Date().toISOString(),
   };
-  await atomicWriteJson(cacheFilePath(app.country, app.id), updatedPage);
+  await writeCachedReviewPage(app.country, app.id, updatedPage);
   if (normalizeCountry(currentCountry) !== app.country) {
-    await fs.unlink(cacheFilePath(currentCountry, appId)).catch(() => undefined);
+    await deleteStoredReviewPage(currentCountry, appId).catch(() => undefined);
   }
   return updatedPage;
 }
@@ -465,7 +530,7 @@ export async function updateCachedReviewPageMetadata(
 export async function deleteCachedReviewPage(appId: string, country?: string): Promise<boolean> {
   const page = await findCachedReviewPage(appId, country);
   if (!page) return false;
-  await fs.unlink(cacheFilePath(page.app.country, page.app.id));
+  await deleteStoredReviewPage(page.app.country, page.app.id);
   return true;
 }
 
@@ -716,6 +781,6 @@ export async function generateCachedReviewPage(options: GenerateCachedReviewOpti
     sourceUpdatedAt: page.updatedAt,
     diagnostics: page.diagnostics,
   });
-  await atomicWriteJson(cacheFilePath(country, resolution.app.id), page);
+  await writeCachedReviewPage(country, resolution.app.id, page);
   return { page, cached: false };
 }

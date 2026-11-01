@@ -34,7 +34,7 @@ export function CountryComparisonPanel({ comparison }: { comparison: CountryRese
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-zinc-950">{entry.country.toUpperCase()} 区</p>
-                  <p className="mt-1 text-xs text-zinc-400">更新于 {formatDate(entry.updatedAt)}</p>
+                  <p className="mt-1 text-xs text-zinc-400" suppressHydrationWarning>更新于 {formatDate(entry.updatedAt)}</p>
                 </div>
                 <a href={entry.pagePath} className="inline-flex items-center gap-1 text-xs text-teal-700 hover:text-teal-900">查看 <ArrowUpRight className="h-3.5 w-3.5" /></a>
               </div>

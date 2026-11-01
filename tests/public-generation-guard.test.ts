@@ -1,18 +1,22 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
 import {
+  clientGenerationKey,
+  PUBLIC_GENERATION_COOKIE,
   runGuardedPublicGeneration,
   runGuardedPublicRefresh,
 } from '@/lib/appstore/generation-guard';
 
-function request(ip: string) {
-  return { headers: new Headers({ 'x-real-ip': ip }) } as NextRequest;
+function request(ip: string, cookie?: string) {
+  const headers = new Headers({ 'x-real-ip': ip });
+  if (cookie) headers.set('cookie', `${PUBLIC_GENERATION_COOKIE}=${cookie}`);
+  return new NextRequest('http://localhost/api/research', { headers });
 }
 
 describe('public generation guard', () => {
@@ -80,5 +84,10 @@ describe('public generation guard', () => {
     expect(firstResult).toMatchObject({ status: 'generated', result: { page: 'ready' } });
     expect(secondResult).toMatchObject({ status: 'deduped', result: { page: 'ready' } });
     expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the public quota identity stable across IP changes when a cookie exists', () => {
+    expect(clientGenerationKey(request('203.0.113.12', 'visitor-1')))
+      .toBe(clientGenerationKey(request('198.51.100.20', 'visitor-1')));
   });
 });

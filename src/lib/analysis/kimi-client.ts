@@ -99,6 +99,8 @@ export class KimiClient {
     this.client = new OpenAI({
       apiKey,
       baseURL,
+      timeout: 120_000,
+      maxRetries: 0,
     });
 
     this.model = process.env.QIAOMU_LLM_MODEL ||

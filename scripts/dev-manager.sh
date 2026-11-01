@@ -88,7 +88,7 @@ start_dev() {
     
     # 启动服务
     echo -e "${GREEN}在端口 $port 启动服务...${NC}"
-    npm run dev:$port
+    pnpm run dev:$port
 }
 
 # 停止服务
@@ -132,7 +132,7 @@ clean_cache() {
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -rf node_modules
-        echo -e "${GREEN}已删除 node_modules，请运行 npm install 重新安装依赖${NC}"
+        echo -e "${GREEN}已删除 node_modules，请运行 pnpm install 重新安装依赖${NC}"
     fi
     
     echo -e "${GREEN}缓存清理完成${NC}"

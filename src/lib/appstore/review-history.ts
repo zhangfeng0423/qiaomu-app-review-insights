@@ -6,6 +6,7 @@ import { AppStoreLookupResult, normalizeCountry } from '@/lib/appstore/discovery
 import { ReviewDiagnostics, buildReviewDiagnostics } from '@/lib/appstore/diagnostics';
 import { ReviewStats, summarizeReviews } from '@/lib/appstore/review-summary';
 import { AppStoreReview } from '@/types';
+import { getServerSupabase, shouldUseSupabasePersistence } from '@/lib/server/supabase';
 
 export interface ReviewHistoryVersionSnapshot {
   version: string;
@@ -70,6 +71,12 @@ function sortReviewsByDateDesc(reviews: AppStoreReview[]) {
 }
 
 async function readHistory(country: string, appId: string): Promise<ReviewHistoryFile | null> {
+  if (shouldUseSupabasePersistence()) {
+    const { data, error } = await getServerSupabase().from('app_review_history')
+      .select('payload').eq('cache_key', safeHistoryKey(country, appId)).maybeSingle();
+    if (error) throw error;
+    return data?.payload ? data.payload as ReviewHistoryFile : null;
+  }
   try {
     const content = await fs.readFile(historyFilePath(country, appId), 'utf8');
     return JSON.parse(content) as ReviewHistoryFile;
@@ -178,7 +185,14 @@ export async function upsertReviewHistory(
     snapshots,
   };
 
-  await atomicWriteJson(historyFilePath(country, app.id), history);
+  if (shouldUseSupabasePersistence()) {
+    const { error } = await getServerSupabase().from('app_review_history').upsert({
+      cache_key: safeHistoryKey(country, app.id), payload: history, updated_at: now,
+    }, { onConflict: 'cache_key' });
+    if (error) throw error;
+  } else {
+    await atomicWriteJson(historyFilePath(country, app.id), history);
+  }
 }
 
 export async function getReviewHistory(country: string, appId: string, limit = 12) {

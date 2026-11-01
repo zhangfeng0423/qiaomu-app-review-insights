@@ -13,6 +13,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      APP_REVIEW_LOCAL_PERSISTENT: 'true'
     ports:
       - "127.0.0.1:3095:3000"
     volumes:

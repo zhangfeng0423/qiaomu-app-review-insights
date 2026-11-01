@@ -14,11 +14,11 @@ echo "✅ 环境变量检查通过"
 
 # 安装依赖
 echo "📦 安装依赖..."
-npm install
+pnpm install
 
 # 构建项目
 echo "🔨 构建项目..."
-npm run build
+pnpm run build
 
 # 检查构建结果
 if [ $? -eq 0 ]; then
@@ -31,7 +31,7 @@ fi
 # 运行测试（如果有）
 if [ -f "package.json" ] && grep -q "\"test\"" package.json; then
     echo "🧪 运行测试..."
-    npm test
+    pnpm test
 fi
 
 echo "🎉 部署准备完成！"
