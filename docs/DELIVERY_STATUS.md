@@ -1,98 +1,64 @@
-# Delivery status
+# Public trial delivery status
 
-Goal: deliver the public trial with durable reports and jobs, verified quotas,
-runtime evidence, a personal-fork PR, and a verified deployment.
+Updated: 2026-11-01 (Asia/Shanghai). Target: the personal fork only.
 
-## Verified during delivery audit
+## Release coordinates
 
-- Supabase CLI authenticated; project `aycdtkpiuptagwhcvwrt` is ACTIVE_HEALTHY.
-- Personal GitHub account: `zhangfeng0423`; target remote: `fork`.
-- Preserve all existing working-tree changes. No applicable AGENTS.md found.
-- Supabase REST from this machine currently fails TLS; system DNS returns a
-  Mihomo fake IP. A real-IP resolution attempt also failed. Investigating proxy.
-- Vercel team `team_kqlekZiAyF0tQem2laieJB8h` has 12 projects; none is named
-  qiaomu-app-review-insights. Repository bindings still need inspection.
-- Delivery branch: `codex/public-trial-delivery`.
-- `node scripts/supabase-delivery.mjs migrate`: succeeded against the dedicated
-  project. Four tables verified with RLS, no anon SELECT privilege, server INSERT.
-- `node scripts/supabase-delivery.mjs import`: six reports imported; each JSONB
-  payload compared equal to the local original. History import added subsequently.
-- `pnpm test`: 11 passed; `pnpm exec tsc --noEmit` and `git diff --check`: passed
-  after the history adapter change. These do not yet verify durable generation.
-- Management API works with CLI credentials; REST TLS fails with system DNS,
-  explicit real IP, HTTP proxy and SOCKS proxy. Keep local mode until runtime
-  connectivity is proven. Do not disable TLS verification.
-- Five histories imported and JSONB-compared successfully; originals retained.
-- Migration `202610310002_durable_jobs.sql` applied. New admissions use advisory
-  locks for IP quotas and App jobs, single-worker claims, leases and explicit
-  interrupted states; anonymous roles cannot invoke admission/claim/status RPCs.
-- `node scripts/verify-durable-jobs.mjs`: passed against the real database:
-  concurrent last-slot reservation, cross-client dedupe, simultaneous worker
-  claims, expired lease, rejection of automatic replay, and retry cooldown.
-  Only synthetic rows for that invocation are removed after testing.
-- Supabase-mode routes now accept persisted jobs with HTTP 202, execute after
-  response through Next.js after(), and expose a no-store status endpoint.
-  Polling can restart queued execution via the atomic claim; interrupted running
-  jobs require an explicit retry rather than automatic potentially paid replay.
-- Home, chart generation and report refresh share async polling; the latest job
-  ID is retained locally for home-page recovery. SDK retries disabled and LLM
-  request timeout set to 120 seconds to avoid implicit paid request duplication.
-- Legacy AI GET endpoints and translation now require the existing admin boundary.
-- Current unit tests: 13 passed; TypeScript passed. Real DB job assertions pass;
-  end-to-end app execution over REST and browser recovery are still unverified.
-- Latest completed production build (including job routes and browser transport)
-  passed. Lint is back to the 9 pre-existing warnings; hydration scan passed.
-- Health endpoint now probes the report table and job RPC with five-second
-  deadlines and responds 503 on dependency failure. Docker explicitly declares
-  its mounted persistent volume; local mode no longer implies durability.
-- Personal fork has no GitHub deployments. Vercel CLI lacks local credentials;
-  connected Vercel tools can inspect the user's team. Existing deployment binding
-  discovery remains open (do not use the upstream homepage as the user's target).
+- Repository: https://github.com/zhangfeng0423/qiaomu-app-review-insights
+- Delivery branch: `codex/public-trial-delivery`
+- PR: https://github.com/zhangfeng0423/qiaomu-app-review-insights/pull/1
+- Public URL: https://qiaomu-app-review-insights-delta.vercel.app
+- Vercel project: `prj_5jAnOgaLgOv0X9DDQB1IINvfDbCf`
+- Supabase project: `aycdtkpiuptagwhcvwrt` (Seoul)
+- Verified production deployment: `dpl_7Nh97w9FBp9z1CNEC1CbVEjt7c42`, commit `ee997de`.
+- Final homepage canonical correction and additional failure tests await final deployment/CI verification.
 
-## Required work (not yet delivered)
+## Requirement audit
 
-Latest runtime evidence:
+- [x] Inspected repository instructions, scripts and existing changes; preserved user work on a dedicated branch.
+- [x] Applied repeatable persistence and durable-job migrations with RLS and server-role grants.
+- [x] Verified server REST access and denial of anonymous report SELECT and job admission RPC.
+- [x] Imported six reports and five histories; compared every JSON payload and retained local originals.
+- [x] Enabled Supabase runtime persistence for public reports, history, quotas and tasks.
+- [x] Real database concurrency test: last-slot quota admission, cross-client App dedupe, single-worker claim, expiry and cooldown.
+- [x] Persisted queued/running/completed/failed/interrupted jobs; queued work can be reclaimed after dispatch loss, running paid work is never automatically replayed.
+- [x] Browser polling resumes the saved job ID after refresh; server logs show the same AI task ID before/after reload, without a second generation POST.
+- [x] Strict Apple URL/region validation and candidate selection; reviewed error states and source boundaries.
+- [x] Zero reviews, low sample with missing credentials, AI timeout, Apple failure, no matches and invalid input covered by isolated tests.
+- [x] Real Apple fetch plus one real AI analysis completed with 160 Duolingo reviews and 18 insight points.
+- [x] Restarted application and read the same completed task and report from Supabase.
+- [x] Desktop (1440px) and mobile (390px) report evidence, charts, keyboard tabs and overflow checks; no browser warning/error logs.
+- [x] Live production health, homepage, persisted report, missing-report state, discover, opportunities, robots and sitemap returned 200.
+- [x] Live invalid input/URL/region returned 400, unknown job 404, legacy paid helpers 401, cached AI research 200 with cached=true.
+- [x] Live Signal review-only task `1de8b9cd-0902-4ee8-a063-cc424cf3440e` completed through production after() execution and rendered in the mobile browser.
+- [x] Health probes actual table/RPC connectivity and returns 503 on dependency failure.
+- [x] CI, pinned pnpm lock/install, repeatable migration/import commands and deployment/rollback handbook included.
+- [x] Changes pushed and personal-fork PR created; upstream repository and unrelated projects unchanged.
+- [ ] Final revision CI and production deployment verified; PR marked ready and release coordinates finalized.
 
-- Supabase REST failure was caused by the machine's proxy routing (the fallback
-  selected DIRECT). An isolated proxy process using the user's existing egress
-  connected successfully without changing system proxy selection or disabling TLS.
-- Runtime server read reports=6/histories=5; anonymous REST report SELECT and job
-  reservation RPC were both denied. Local Supabase mode now enabled.
-- `/api/health` returned 200, database connected and durable true.
-- Real Apple RSS fetched 160 Duolingo samples; one real AI task completed without
-  aiError. Task `700abe17-7114-4638-8579-78b0d2b32bd3` is completed; report path
-  `/apps/us/570060128/duolingo-learn-languages`. A homepage reload polled the same
-  task ID, without a second generation POST (server logs).
-- In-app browser displayed the real AI summary, 18 insight points and original
-  evidence. At 390px, trend tab has five charts, document scrollWidth=390, no
-  browser warn/error logs. Report evidence and desktop acceptance still pending.
-- Created dedicated Vercel project `prj_5jAnOgaLgOv0X9DDQB1IINvfDbCf` bound to
-  the personal fork. Node 22, pnpm frozen install, production-only server secrets
-  configured. Existing unrelated projects were not altered. No deployment yet.
-- Current unit tests: 15 passed (including strict URL/region input tests).
-- Delivery commit `bc70836` pushed; personal fork PR #1 created as draft.
-- GitHub CI run 41263007671 passed every check on Node 22 from a clean checkout.
-- Restart durability verified: a new app process returned the same completed
-  Duolingo task, 160 reviews, and AI summary from Supabase; health remained connected.
-- Initial Vercel deployment failed at adapter packaging: Next 16.3 standalone
-  ENOENT for next-server.js.nft.json (upstream issue vercel/next.js#96646).
-  Vercel now uses adapter output; Docker keeps standalone.
-- Verified primary project domain: qiaomu-app-review-insights-delta.vercel.app.
-  Production canonical URL configuration corrected to this assigned domain.
+## Verification evidence
 
-- [ ] Verify/apply repeatable migrations and RLS; real server read/write and anonymous isolation.
-- [ ] Import existing reports and histories, verify contents, enable persistence.
-- [ ] Replace read/modify/write quotas with atomic reservations.
-- [ ] Replace process-only deduplication with persistent jobs, leases and recovery.
-- [ ] Verify all public AI entry points and input/error states.
-- [ ] Real Apple fetch and one real AI generation; restart durability.
-- [ ] Desktop/mobile browser acceptance and meaningful regression tests.
-- [ ] Honest dependency health checks, CI, install/deploy/rollback instructions.
-- [ ] Personal fork delivery branch, reviewed commit, push and PR.
-- [ ] Confirm owned deployment target, deploy and verify online.
+- Current local tests: 21 passed across seven files; TypeScript and diff checks passed.
+- Previous complete check run: tests, lint, hydration, build, TypeScript and diff all passed.
+- Clean Node 22 CI run 41263007671 passed every configured check; subsequent adapter-fix CI runs also passed.
+- Lint retains nine existing legacy-screen warnings and no errors. No new lint rule suppression was introduced.
+- Build tracing warnings fixed by explicit runtime cache access annotations.
+- Initial Vercel failure was Next 16.3 standalone/adapter ENOENT (vercel/next.js#96646).
+  Conditional platform output fixed it; Docker retains standalone.
+- Runtime restart check returned completed Duolingo job, reviews=160, AI summary present, health connected.
+- 390px trend view: document scrollWidth=390, five chart canvases, no browser warn/error logs.
+- 1440px report: scrollWidth=1440; evidence heading visible; Home key selected first report tab.
+- Live health: ok=true, database=connected, cacheBackend=supabase, generationBackend=supabase, durable=true.
+- Dedicated real-DB verifier: `node scripts/verify-durable-jobs.mjs` passed without model calls and cleaned only its own synthetic fixtures.
 
-## Evidence policy
+## Operating limits and handoff
 
-Historical test/build claims are not acceptance evidence for the delivery changes.
-Record fresh results and exact commands here. Do not record keys, tokens or
-credential-bearing URLs. The goal remains active while any required item is open.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for setup, migration, execution semantics, secret scopes, release and rollback.
+
+- Daily quota defaults to five task admissions per network identity (review fetches and analyses count), plus App cooldowns.
+- Interrupted work needs an explicit retry; retry may make another paid call. There is no promise of unattended automatic replay.
+- Production secrets are server-only and scoped to this project's Production environment; preview builds do not receive them.
+- Local direct Supabase TLS failed because the machine's fallback proxy rule used DIRECT.
+  An isolated proxy using existing user egress proved the cause and enabled local verification without changing system settings or disabling TLS.
+  Vercel production connects directly and health is verified.
+- No automatic PR merge, paid plan upgrade, domain ownership change or business-data deletion was performed.
